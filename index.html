@@ -475,7 +475,12 @@ function processCamFrame() {
         let totalX = 0, totalY = 0, count = 0;
 
         for (let i = 0; i < data.length; i += 4) {
-            if (data[i] > 160 && data[i+1] < 90 && data[i+2] < 90) { // Red Threshold
+            let r = data[i];
+            let g = data[i+1];
+            let b = data[i+2];
+            
+            // Ratio-based threshold: Red must be the dominant color, even in shadows
+            if (r > 90 && r > g * 1.5 && r > b * 1.5) { 
                 const pIdx = i / 4;
                 totalX += pIdx % vCanvas.width;
                 totalY += Math.floor(pIdx / vCanvas.width);
@@ -484,7 +489,8 @@ function processCamFrame() {
         }
 
         let curRawSpeedMs = 0;
-        if (count > 40) {
+        // Lowered pixel count threshold in case you stand further back
+        if (count > 15) { 
             const curX = totalX / count;
             const curY = totalY / count;
             const curTime = performance.now();
