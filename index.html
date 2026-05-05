@@ -1,154 +1,1317 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Putter Tracker - Front Cam</title>
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: #000;
-            color: white;
-            text-align: center;
-            margin: 0;
-            overflow: hidden; /* Prevents bouncing on mobile */
-        }
-        #video-container {
-            position: relative;
-            width: 100vw;
-            height: 70vh;
-            background: #111;
-        }
-        video {
-            display: none; /* We draw the video onto the canvas instead */
-        }
-        canvas {
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
-        }
-        .dashboard {
-            height: 30vh;
-            background: #1a1a1a;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            border-top: 2px solid #333;
-        }
-        .speed-val {
-            font-size: 4rem;
-            font-weight: 900;
-            color: #00ff88;
-            margin: 0;
-        }
-        .label {
-            color: #888;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            font-size: 0.8rem;
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Green Physics Pro - Unified Practice</title>
+<style>
+body { margin: 0; overflow: hidden; background: #000; font-family: -apple-system, sans-serif; color: white; }
+
+/* Original UI CSS */
+#uiToggle { position: absolute; top: 10px; left: 10px; z-index: 100; background: #28a745; color: white; border: none; padding: 10px 15px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
+#ui { position: absolute; top: 55px; left: 10px; background: rgba(0,0,0,0.92); padding: 15px; border-radius: 12px; z-index: 10; width: 300px; pointer-events: none; border: 1px solid #444; display: none; max-height: 80vh; overflow-y: auto; }
+#ui.visible { display: block; pointer-events: auto; }
+
+.slider-group { margin: 12px 0; }
+label { font-size: 10px; color: #aaa; text-transform: uppercase; letter-spacing: 1px; display: block; }
+
+.adj-controls { display: flex; align-items: center; justify-content: space-between; margin-top: 6px; background: #1a1a1a; padding: 6px; border-radius: 8px; border: 1px solid #333; user-select: none; }
+.adj-btn { flex: 1; background: #333; color: white; border: none; border-radius: 4px; padding: 6px 0; margin: 0 3px; font-size: 10px; cursor: pointer; font-weight: bold; transition: 0.1s; text-align: center; }
+.adj-btn:hover { background: #444; }
+.adj-btn:active { background: #28a745; transform: scale(0.95); }
+.val-display { color: #4CAF50; font-family: monospace; font-size: 14px; font-weight: bold; min-width: 65px; text-align: center; margin: 0 5px; }
+
+#controls { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 10; display: flex; flex-wrap: wrap; gap: 8px; width: 95%; max-width: 600px; justify-content: center; }
+.btn { flex: 1 1 calc(25% - 10px); min-width: 90px; background: #28a745; color: white; padding: 12px 5px; border-radius: 10px; border: none; font-weight: bold; cursor: pointer; text-align: center; font-size: 11px; box-sizing: border-box; }
+
+#results { margin-top: 15px; border-top: 1px solid #333; padding-top: 10px; }
+.status-header { text-align: center; margin-bottom: 10px; font-size: 1.1em; letter-spacing: 1px; }
+.status-in { color: #00ff00; font-weight: bold; text-shadow: 0 0 10px rgba(0,255,0,0.4); }
+.status-out { color: #ff4444; font-weight: bold; }
+.data-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.data-item { background: rgba(255,255,255,0.05); padding: 6px; border-radius: 6px; border: 1px solid #222; }
+.label-sm { color: #888; text-transform: uppercase; font-size: 8px; display: block; margin-bottom: 2px; }
+.val { color: #fff; font-family: monospace; font-size: 11px; font-weight: bold; }
+.legend { font-size: 9px; margin-top: 10px; line-height: 1.5; color: #666; font-style: italic; }
+
+.section-title { font-size: 11px; color: #ffaa00; border-bottom: 1px solid #444; padding-bottom: 4px; margin-top: 15px; margin-bottom: 5px; text-transform: uppercase; }
+.img-settings { display: none; background: rgba(255, 170, 0, 0.1); padding: 10px; border-radius: 8px; border: 1px solid #664400; margin-top:10px; }
+
+/* WII GOLF OVERLAY CSS */
+#wiiOverlay, #playOverlay {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.95); z-index: 200; display: none;
+    flex-direction: column; align-items: center; justify-content: center;
+    backdrop-filter: blur(5px); transition: background 0.3s;
+}
+.wii-title { font-size: 2rem; color: #fff; margin-bottom: 20px; letter-spacing: 4px; text-transform: uppercase; text-align: center; text-shadow: 0 2px 5px #000; }
+.wii-target-text { font-size: 1.8rem; color: #00ffcc; margin-bottom: 40px; font-weight: bold; text-shadow: 0 2px 5px #000;}
+.wii-bar-container {
+    width: 85%; max-width: 600px; height: 80px; background: rgba(26,26,26,0.8); 
+    border: 4px solid #444; border-radius: 40px; position: relative; overflow: hidden;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+}
+#wiiBarFill { width: 0%; height: 100%; background: linear-gradient(90deg, #28a745, #ffeb3b, #dc3545); }
+#wiiTargetLine { position: absolute; top: 0; bottom: 0; width: 6px; background: #ffffff; box-shadow: 0 0 15px rgba(255,255,255,0.8); z-index: 3; transform: translateX(-50%); }
+.wii-zone-line { position: absolute; top: 0; bottom: 0; width: 4px; z-index: 2; transform: translateX(-50%); border-radius: 2px; }
+#wiiShortLine { background: #00ccff; box-shadow: 0 0 10px rgba(0,204,255,0.6); }
+#wiiLongLine { background: #ff4444; box-shadow: 0 0 10px rgba(255,68,68,0.6); }
+.wii-speed-text { font-size: 3rem; color: #fff; margin-top: 40px; font-weight: bold; font-family: monospace; text-shadow: 0 2px 5px #000;}
+#wiiFeedback, #playCalFeedback { font-size: 2.5rem; margin-top: 20px; font-weight: bold; color: transparent; text-transform: uppercase; letter-spacing: 2px; text-shadow: none; transition: 0.3s; }
+#wiiDistanceFeedback { font-size: 1.5rem; margin-top: 10px; font-weight: normal; color: #ccc; letter-spacing: 1px; min-height: 28px; text-shadow: 0 2px 5px #000;}
+.close-btn { position: absolute; top: 30px; right: 30px; background: #dc3545; color: #fff; border: none; font-size: 1.5rem; font-weight: bold; width: 60px; height: 60px; border-radius: 30px; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.5); z-index: 250;}
+
+/* PLAY MODE CSS */
+.play-phase { display: flex; flex-direction: column; align-items: center; width: 90%; max-width: 400px; z-index: 210;}
+.play-input-group { width: 100%; background: rgba(26,26,26,0.9); padding: 15px; border-radius: 12px; border: 1px solid #444; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; }
+.play-input-group label { font-size: 14px; color: #fff; text-transform: none; font-weight: bold; margin: 0; }
+.play-input-group input { width: 80px; padding: 10px; border-radius: 8px; border: 1px solid #555; background: #000; color: #00ffcc; font-size: 18px; font-weight: bold; text-align: center; }
+
+/* VISION CAMERA CSS */
+#visionContainer { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 150; display: none; pointer-events: none; }
+#visionContainer canvas { width: 100%; height: 100%; object-fit: cover; }
+</style>
 </head>
 <body>
 
-    <div id="video-container">
-        <video id="webcam" playsinline muted></video>
-        <canvas id="outputCanvas"></canvas>
-    </div>
+<div id="visionContainer">
+    <video id="webcam" playsinline muted style="display:none;"></video>
+    <canvas id="visionCanvas"></canvas>
+</div>
 
-    <div class="dashboard">
-        <p class="label">Putter Speed</p>
-        <p class="speed-val" id="speedOutput">0</p>
-        <p class="label">Pixels/Sec</p>
-    </div>
+<div id="wiiOverlay">
+<button id="closeWiiBtn" class="close-btn">X</button>
+<div class="wii-title">Practice Swing</div>
+<div class="wii-target-text">TARGET: <span id="wiiTargetVal">0.00</span></div>
 
-    <script>
-        const video = document.getElementById('webcam');
-        const canvas = document.getElementById('outputCanvas');
-        const ctx = canvas.getContext('2d', { willReadFrequently: true });
-        const speedOutput = document.getElementById('speedOutput');
+<div class="wii-bar-container">
+<div id="wiiBarFill"></div>
+<div id="wiiShortLine" class="wii-zone-line"></div>
+<div id="wiiTargetLine"></div>
+<div id="wiiLongLine" class="wii-zone-line"></div>
+</div>
 
-        let lastX = null, lastY = null, lastTime = null;
+<div class="wii-speed-text"><span id="wiiSpeedVal">0.00</span></div>
+<div id="wiiFeedback">AWAITING SWING</div>
+<div id="wiiDistanceFeedback"></div>
+</div>
 
-        // Start Camera - Specifically requesting the FRONT camera
-        navigator.mediaDevices.getUserMedia({ 
-            video: { 
-                facingMode: "user",
-                width: { ideal: 640 },
-                height: { ideal: 480 }
-            } 
-        })
-        .then(stream => {
-            video.srcObject = stream;
-            video.play();
-            requestAnimationFrame(processFrame);
-        })
-        .catch(err => alert("Camera error: " + err));
+<div id="playOverlay">
+<button id="closePlayBtn" class="close-btn">X</button>
 
-        function processFrame() {
-            if (video.readyState === video.HAVE_ENOUGH_DATA) {
-                // Match canvas size to video size
-                if (canvas.width !== video.videoWidth) {
-                    canvas.width = video.videoWidth;
-                    canvas.height = video.videoHeight;
-                }
+<div id="playPhase1" class="play-phase">
+<div class="wii-title">1. Calibration Putt</div>
+<div style="font-size:1.2rem; color:#fff; margin-bottom:20px; text-align:center; line-height:1.5; text-shadow:0 2px 4px #000;">Hit a normal practice putt.<br>The app will capture its speed.</div>
+<div class="wii-speed-text"><span id="playCalSpeedDisplay">0.00</span></div>
+<div id="playCalFeedback">AWAITING SWING</div>
+</div>
 
-                // 1. Draw the actual camera view
-                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+<div id="playPhase2" class="play-phase" style="display:none;">
+<div class="wii-title">2. Enter Results</div>
+<div style="color:#00ffcc; font-size:1.8rem; margin-bottom:20px; text-shadow:0 2px 4px #000;">Speed Hit: <span id="playCalRecordedSpeed">0.00</span></div>
+
+<div class="play-input-group">
+<label>Steps Rolled:</label>
+<input type="number" id="calSteps" value="10" step="0.5">
+</div>
+<div class="play-input-group">
+<label>Up/Down Slope (deg)<br><span style="font-size:10px; color:#888;">(+ is Uphill, - is Downhill)</span></label>
+<input type="number" id="calUpSlope" value="0" step="0.1">
+</div>
+<div class="play-input-group">
+<label>L/R Slope (deg):</label>
+<input type="number" id="calLRSlope" value="0" step="0.1">
+</div>
+<button id="btnPlayCalibrate" class="btn" style="background:#00bcd4; width:100%; padding:20px; margin-top:10px; font-size:1.2rem; border-radius:12px;">CALIBRATE PUTTER SENSOR</button>
+</div>
+
+<div id="playPhase3" class="play-phase" style="display:none;">
+<div class="wii-title">Play Mode</div>
+<div style="display:flex; justify-content:space-between; width:100%; margin-bottom:20px; align-items:center;">
+<button id="btnRecalibrate" style="background:#444; border:none; color:white; padding:8px 15px; border-radius:5px; cursor:pointer; font-weight:bold;">RECALIBRATE</button>
+<div style="text-align:right;">
+<div style="color:#28a745; font-family:monospace; font-weight:bold; font-size:12px; text-shadow:0 1px 2px #000;" id="lblPlayStimp">STIMP: 10.0</div>
+<div style="color:#ffaa00; font-family:monospace; font-weight:bold; font-size:12px; text-shadow:0 1px 2px #000;" id="lblPlayMult">MULT: 1.00x</div>
+</div>
+</div>
+
+<div class="play-input-group">
+<label>Target Steps:</label>
+<input type="number" id="playSteps" value="15" step="0.5">
+</div>
+<div class="play-input-group">
+<label>Up/Down Slope (deg)<br><span style="font-size:10px; color:#888;">(+ is Uphill, - is Downhill)</span></label>
+<input type="number" id="playUpSlope" value="0" step="0.1">
+</div>
+<div class="play-input-group">
+<label>L/R Slope (deg):</label>
+<input type="number" id="playLRSlope" value="0" step="0.1">
+</div>
+
+<div style="margin-top:20px; text-align:center; background:rgba(17,17,17,0.9); border:2px solid #333; padding:20px; border-radius:15px; width:100%; box-sizing:border-box;">
+<div style="font-size:1rem; color:#aaa; font-weight:bold; letter-spacing:2px; margin-bottom:10px;">RECOMMENDED TARGET SPEED</div>
+<div style="font-size:3.5rem; color:#ffeb3b; font-weight:bold; font-family:monospace;"><span id="playRecSpeed">0.00</span></div>
+</div>
+
+<button id="btnPracticePlay" class="btn" style="background:#28a745; width:100%; padding:20px; margin-top:20px; font-size:1.2rem; border-radius:12px;">PRACTICE THIS PUTT</button>
+</div>
+</div>
+
+<button id="uiToggle">MENU</button>
+
+<div id="ui">
+<h3 style="margin:0 0 10px 0;">Green Physics Pro</h3>
+
+<div id="imgConfig" class="img-settings">
+<div style="color: #ffaa00; font-size: 10px; margin-bottom: 8px; font-weight: bold;">IMAGE SCALE SETTINGS</div>
+<div class="slider-group">
+<label>Front Edge (Yards)</label>
+<div class="adj-controls">
+<button class="adj-btn" data-param="frontYds" data-val="-1">-1</button>
+<button class="adj-btn" data-param="frontYds" data-val="-0.1">-0.1</button>
+<span id="frontYdsVal" class="val-display">100.0</span>
+<button class="adj-btn" data-param="frontYds" data-val="0.1">+0.1</button>
+<button class="adj-btn" data-param="frontYds" data-val="1">+1</button>
+</div>
+</div>
+<div class="slider-group">
+<label>Back Edge (Yards)</label>
+<div class="adj-controls">
+<button class="adj-btn" data-param="backYds" data-val="-1">-1</button>
+<button class="adj-btn" data-param="backYds" data-val="-0.1">-0.1</button>
+<span id="backYdsVal" class="val-display">130.0</span>
+<button class="adj-btn" data-param="backYds" data-val="0.1">+0.1</button>
+<button class="adj-btn" data-param="backYds" data-val="1">+1</button>
+</div>
+</div>
+<div class="slider-group">
+<label>Max Slope (deg)</label>
+<div class="adj-controls">
+<button class="adj-btn" data-param="slope" data-val="-1">-1</button>
+<button class="adj-btn" data-param="slope" data-val="-0.1">-0.1</button>
+<span id="slopeVal" class="val-display">3.0°</span>
+<button class="adj-btn" data-param="slope" data-val="0.1">+0.1</button>
+<button class="adj-btn" data-param="slope" data-val="1">+1</button>
+</div>
+</div>
+</div>
+
+<div class="section-title">Environment</div>
+<div class="slider-group">
+<label>Mesh Smoothness</label>
+<div class="adj-controls">
+<button class="adj-btn" data-param="smooth" data-val="-1">-1</button>
+<button class="adj-btn" data-param="smooth" data-val="-0.1">-0.1</button>
+<span id="smoothVal" class="val-display">20</span>
+<button class="adj-btn" data-param="smooth" data-val="0.1">+0.1</button>
+<button class="adj-btn" data-param="smooth" data-val="1">+1</button>
+</div>
+</div>
+<div class="slider-group">
+<label>Stimp (Speed)</label>
+<div class="adj-controls">
+<button class="adj-btn" data-param="stimp" data-val="-1">-1</button>
+<button class="adj-btn" data-param="stimp" data-val="-0.1">-0.1</button>
+<span id="stimpVal" class="val-display">10.0</span>
+<button class="adj-btn" data-param="stimp" data-val="0.1">+0.1</button>
+<button class="adj-btn" data-param="stimp" data-val="1">+1</button>
+</div>
+</div>
+
+<div class="section-title">Putt Parameters</div>
+
+<div class="slider-group">
+<label>Speed Sensor Input</label>
+<div class="adj-controls">
+<button class="adj-btn mode-btn" data-mode="gyro" style="background:#28a745;">PHONE GYRO</button>
+<button class="adj-btn mode-btn" data-mode="vision" style="background:#333;">CAMERA (RED DOT)</button>
+</div>
+</div>
+
+<div class="slider-group gyro-only">
+<label>Gyro Axes (Toggle Multiple)</label>
+<div class="adj-controls">
+<button class="adj-btn axis-btn" data-axis="alpha" style="background:#333;">ALPHA</button>
+<button class="adj-btn axis-btn" data-axis="beta" style="background:#28a745;">BETA</button>
+<button class="adj-btn axis-btn" data-axis="gamma" style="background:#333;">GAMMA</button>
+</div>
+</div>
+
+<div class="slider-group">
+<label>Sensor Multiplier (Calibration)</label>
+<div class="adj-controls">
+<button class="adj-btn" data-param="speedMult" data-val="-0.1">-0.1</button>
+<button class="adj-btn" data-param="speedMult" data-val="-0.01">-0.01</button>
+<span id="speedMultVal" class="val-display">1.00x</span>
+<button class="adj-btn" data-param="speedMult" data-val="0.01">+0.01</button>
+<button class="adj-btn" data-param="speedMult" data-val="0.1">+0.1</button>
+</div>
+</div>
+<div class="slider-group">
+<label>Aim Offset</label>
+<div class="adj-controls">
+<button class="adj-btn" data-param="aim" data-val="-1">-1</button>
+<button class="adj-btn" data-param="aim" data-val="-0.1">-0.1</button>
+<span id="aimVal" class="val-display">0.0°</span>
+<button class="adj-btn" data-param="aim" data-val="0.1">+0.1</button>
+<button class="adj-btn" data-param="aim" data-val="1">+1</button>
+</div>
+</div>
+<div class="slider-group">
+<label>Optimal Power Target (Sensor Speed)</label>
+<div class="adj-controls">
+<button class="adj-btn" data-param="pwr" data-val="-1">-1</button>
+<button class="adj-btn" data-param="pwr" data-val="-0.1">-0.1</button>
+<span id="pwrVal" class="val-display">3.20</span>
+<button class="adj-btn" data-param="pwr" data-val="0.1">+0.1</button>
+<button class="adj-btn" data-param="pwr" data-val="1">+1</button>
+</div>
+</div>
+
+<div id="results">Upload .PLY or Image to start.</div>
+<div class="legend"><span style="color:#ff00ff;">➔</span> Pink Arrow: Fall Line<br><span style="color:#ffffff;">---</span> White Dotted: Aim Line</div>
+</div>
+
+<div id="controls">
+<label class="btn" style="background:#555;">LOAD PLY<input type="file" id="plyInput" accept=".ply" style="display:none;"></label>
+<label class="btn" style="background:#007bff;">LOAD IMG<input type="file" id="imgInput" accept="image/*" style="display:none;"></label>
+<label class="btn" style="background:#8e44ad;">LOAD SAVED<input type="file" id="loadSaveInput" accept=".json" style="display:none;"></label>
+<button id="playModeBtn" class="btn" style="background:#e91e63;">PLAY MODE</button>
+<button id="practiceBtn" class="btn" style="background:#00bcd4; display:none;">PRACTICE</button>
+<button id="optimizeBtn" class="btn" style="background:#28a745; display:none;">OPTIMIZE</button>
+<button id="resetBtn" class="btn" style="background:#dc3545; display:none;">RESET</button>
+<button id="saveBtn" class="btn" style="background:#e67e22; display:none;">SAVE</button>
+</div>
+
+<script type="importmap">
+{
+"imports": {
+"three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+"three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+}
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { PLYLoader } from 'three/addons/loaders/PLYLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+let scene, camera, renderer, controls, raycaster, mouse, meshSurface;
+let selectedPoints = [], markers = [], ballPathMesh = null, fallLineArrow = null, flatRefLine = null;
+let ghostBall = null, pathData = [];
+
+let currentMode = null; 
+let lastGeo = null; 
+let currentImage = null; 
+let originalFileDataBase64 = null; 
+
+let sysParams = {
+    frontYds: 100.0, backYds: 130.0, slope: 3.0,
+    smooth: 20, stimp: 10.0, aim: 0.0, pwr: 3.2, speedMult: 1.0
+};
+
+// --- SENSOR & VISION VARIABLES ---
+let inputMode = 'gyro'; // 'gyro' or 'vision'
+let isGyroInit = false;
+let isCamInit = false;
+let gyroPeak = 0;
+let isSwinging = false;
+let swingTimer = null;
+let resetUITimer = null; 
+const RADIUS_TO_PIVOT_METERS = 1.3;
+let recentSpeeds = [0, 0, 0];
+let activeAxes = { alpha: false, beta: true, gamma: false }; 
+let activeOverlay = 'none'; // 'none', 'wii', 'play1'
+
+// Vision Tracking Vars
+const video = document.getElementById('webcam');
+const vCanvas = document.getElementById('visionCanvas');
+const vCtx = vCanvas.getContext('2d', { willReadFrequently: true });
+let lastCamX = null, lastCamY = null, lastCamTime = null;
+
+// Target Window speeds (Wii Mode)
+let wiiMaxSpeed = 5.0; 
+let pwrShort = 0;
+let pwrLong = 0;
+
+const uiPanel = document.getElementById('ui');
+
+// Wii UI Elements
+const wiiOverlay = document.getElementById('wiiOverlay');
+const wiiTargetVal = document.getElementById('wiiTargetVal');
+const wiiSpeedVal = document.getElementById('wiiSpeedVal');
+const wiiBarFill = document.getElementById('wiiBarFill');
+const wiiTargetLine = document.getElementById('wiiTargetLine');
+const wiiShortLine = document.getElementById('wiiShortLine');
+const wiiLongLine = document.getElementById('wiiLongLine');
+const wiiFeedback = document.getElementById('wiiFeedback');
+const wiiDistanceFeedback = document.getElementById('wiiDistanceFeedback');
+const visionContainer = document.getElementById('visionContainer');
+
+// Play Mode Elements
+const playOverlay = document.getElementById('playOverlay');
+const playPhase1 = document.getElementById('playPhase1');
+const playPhase2 = document.getElementById('playPhase2');
+const playPhase3 = document.getElementById('playPhase3');
+const playCalSpeedDisplay = document.getElementById('playCalSpeedDisplay');
+const playCalFeedback = document.getElementById('playCalFeedback');
+const playCalRecordedSpeed = document.getElementById('playCalRecordedSpeed');
+const lblPlayStimp = document.getElementById('lblPlayStimp');
+const lblPlayMult = document.getElementById('lblPlayMult');
+
+document.getElementById('uiToggle').onclick = () => uiPanel.classList.toggle('visible');
+
+// Input Mode Toggle
+document.querySelectorAll('.mode-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+        inputMode = e.target.getAttribute('data-mode');
+        document.querySelectorAll('.mode-btn').forEach(b => b.style.background = '#333');
+        e.target.style.background = '#28a745';
+        document.querySelectorAll('.gyro-only').forEach(el => el.style.display = inputMode === 'gyro' ? 'block' : 'none');
+    });
+});
+
+document.querySelectorAll('.axis-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+        const axis = e.target.getAttribute('data-axis');
+        activeAxes[axis] = !activeAxes[axis]; 
+        e.target.style.background = activeAxes[axis] ? '#28a745' : '#333';
+    });
+});
+
+init();
+updateAllParamDisplays(); 
+
+function init() {
+    scene = new THREE.Scene();
+    camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(0, 15, 20);
+    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(window.devicePixelRatio);
+    document.body.appendChild(renderer.domElement);
+    controls = new OrbitControls(camera, renderer.domElement);
+    raycaster = new THREE.Raycaster();
+    mouse = new THREE.Vector2();
+
+    scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+    const light = new THREE.DirectionalLight(0xffffff, 1.2);
+    light.position.set(5, 20, 10);
+    scene.add(light);
+
+    ghostBall = new THREE.Mesh(new THREE.SphereGeometry(0.021, 16, 16), new THREE.MeshBasicMaterial({color: 0xffffff}));
+    ghostBall.visible = false;
+    scene.add(ghostBall);
+
+    window.addEventListener('pointerdown', (e) => {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON' || uiPanel.contains(e.target) || wiiOverlay.contains(e.target) || playOverlay.contains(e.target) || !meshSurface) return;
+        onPick(e);
+    });
+
+    animate();
+}
+
+function initInputSafe(callback) {
+    if (inputMode === 'gyro') {
+        if (!activeAxes.alpha && !activeAxes.beta && !activeAxes.gamma) {
+            alert("Please select at least one Gyro Axis in the menu to track swings!");
+            return;
+        }
+        if (!isGyroInit) {
+            if (typeof DeviceMotionEvent.requestPermission === 'function') {
+                let btn = document.createElement('button');
+                btn.innerText = "ALLOW MOTION SENSORS";
+                btn.style.cssText = "position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:999;padding:20px;font-size:20px;border-radius:10px;background:#007bff;color:white;border:none;";
+                document.body.appendChild(btn);
+
+                btn.onclick = async () => {
+                    try {
+                        const permissionState = await DeviceMotionEvent.requestPermission();
+                        if (permissionState === 'granted') {
+                            document.body.removeChild(btn);
+                            isGyroInit = true;
+                            window.addEventListener('devicemotion', handleMotion);
+                            callback();
+                        } else { alert("Permission denied for motion sensors."); }
+                    } catch(e) { console.error(e); }
+                };
+            } else {
+                isGyroInit = true;
+                window.addEventListener('devicemotion', handleMotion);
+                callback();
+            }
+        } else { callback(); }
+    } else if (inputMode === 'vision') {
+        if (!isCamInit) {
+            navigator.mediaDevices.getUserMedia({ 
+                video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } } 
+            }).then(stream => {
+                video.srcObject = stream;
+                video.play();
+                isCamInit = true;
+                requestAnimationFrame(processCamFrame);
+                callback();
+            }).catch(err => alert("Camera error: " + err));
+        } else { callback(); }
+    }
+}
+
+// --- VISION TRACKING ENGINE ---
+function processCamFrame() {
+    if (inputMode === 'vision' && video.readyState === video.HAVE_ENOUGH_DATA && (activeOverlay === 'wii' || activeOverlay === 'play1')) {
+        if (vCanvas.width !== video.videoWidth) {
+            vCanvas.width = video.videoWidth;
+            vCanvas.height = video.videoHeight;
+        }
+        
+        vCtx.drawImage(video, 0, 0, vCanvas.width, vCanvas.height);
+        const data = vCtx.getImageData(0, 0, vCanvas.width, vCanvas.height).data;
+        let totalX = 0, totalY = 0, count = 0;
+
+        for (let i = 0; i < data.length; i += 4) {
+            if (data[i] > 160 && data[i+1] < 90 && data[i+2] < 90) { // Red Threshold
+                const pIdx = i / 4;
+                totalX += pIdx % vCanvas.width;
+                totalY += Math.floor(pIdx / vCanvas.width);
+                count++;
+            }
+        }
+
+        let curRawSpeedMs = 0;
+        if (count > 40) {
+            const curX = totalX / count;
+            const curY = totalY / count;
+            const curTime = performance.now();
+
+            // Draw highlight on camera feed
+            vCtx.beginPath(); vCtx.arc(curX, curY, 20, 0, Math.PI*2);
+            vCtx.strokeStyle = "#00ff88"; vCtx.lineWidth = 4; vCtx.stroke();
+            vCtx.beginPath(); vCtx.arc(curX, curY, 4, 0, Math.PI*2);
+            vCtx.fillStyle = "#fff"; vCtx.fill();
+
+            if (lastCamX !== null && lastCamTime !== null) {
+                const dt = (curTime - lastCamTime) / 1000;
+                const distPx = Math.sqrt((curX - lastCamX)**2 + (curY - lastCamY)**2);
+                let speedPxSec = distPx / dt;
                 
-                const frameData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                const data = frameData.data;
-                let totalX = 0, totalY = 0, count = 0;
-
-                // 2. Track the RED dot
-                for (let i = 0; i < data.length; i += 4) {
-                    const r = data[i], g = data[i+1], b = data[i+2];
-                    // Detection for bright red
-                    if (r > 160 && g < 90 && b < 90) {
-                        const pixelIndex = i / 4;
-                        totalX += pixelIndex % canvas.width;
-                        totalY += Math.floor(pixelIndex / canvas.width);
-                        count++;
-                    }
-                }
-
-                if (count > 40) {
-                    const curX = totalX / count;
-                    const curY = totalY / count;
-                    const curTime = performance.now();
-
-                    // 3. DRAW THE HIGHLIGHT (The "Target")
-                    // Outer Ring
-                    ctx.beginPath();
-                    ctx.arc(curX, curY, 25, 0, Math.PI * 2);
-                    ctx.strokeStyle = "#00ff88";
-                    ctx.lineWidth = 3;
-                    ctx.stroke();
-                    
-                    // Center Dot
-                    ctx.beginPath();
-                    ctx.arc(curX, curY, 5, 0, Math.PI * 2);
-                    ctx.fillStyle = "#fff";
-                    ctx.fill();
-
-                    // 4. Calculate Speed
-                    if (lastX !== null && lastTime !== null) {
-                        const dt = (curTime - lastTime) / 1000;
-                        const dist = Math.sqrt((curX - lastX)**2 + (curY - lastY)**2);
-                        const speed = dist / dt;
-                        if (speed < 5000) { // Filter out "teleportation" glitches
-                            speedOutput.innerText = Math.round(speed);
-                        }
-                    }
-                    lastX = curX; lastY = curY; lastTime = curTime;
-                } else {
-                    speedOutput.innerText = "0";
-                    lastX = null;
+                if (speedPxSec > 300 && speedPxSec < 10000) { 
+                    // Map Pixels/Sec to a raw scale (e.g. 1000px/s = 1.0 "sensor speed")
+                    // The Play Mode Calibration will figure out the exact physical multiplier later!
+                    curRawSpeedMs = speedPxSec / 1000.0; 
                 }
             }
-            requestAnimationFrame(processFrame);
+            lastCamX = curX; lastCamY = curY; lastCamTime = curTime;
+        } else {
+            lastCamX = null;
         }
-    </script>
+
+        processSwingSpeed(curRawSpeedMs);
+    }
+    requestAnimationFrame(processCamFrame);
+}
+
+// --- SHARED SENSOR/VISION LOGIC ---
+function handleMotion(e) {
+    if (inputMode !== 'gyro' || (activeOverlay !== 'wii' && activeOverlay !== 'play1')) return;
+    let rot = e.rotationRate;
+    if (!rot) return;
+
+    let alphaSq = activeAxes.alpha && rot.alpha !== null ? Math.pow(rot.alpha, 2) : 0;
+    let betaSq = activeAxes.beta && rot.beta !== null ? Math.pow(rot.beta, 2) : 0;
+    let gammaSq = activeAxes.gamma && rot.gamma !== null ? Math.pow(rot.gamma, 2) : 0;
+
+    let angVelRad = Math.sqrt(alphaSq + betaSq + gammaSq) * (Math.PI / 180);
+    let curRawSpeedMs = RADIUS_TO_PIVOT_METERS * angVelRad;
+    
+    processSwingSpeed(curRawSpeedMs);
+}
+
+function processSwingSpeed(curRawSpeedMs) {
+    recentSpeeds.push(curRawSpeedMs);
+    if (recentSpeeds.length > 3) recentSpeeds.shift();
+    let smoothedRawSpeedMs = (recentSpeeds[0] + recentSpeeds[1] + recentSpeeds[2]) / 3;
+
+    if (activeOverlay === 'wii') {
+        if (!isSwinging) {
+            wiiSpeedVal.innerText = smoothedRawSpeedMs.toFixed(2);
+            wiiBarFill.style.width = Math.min((smoothedRawSpeedMs / wiiMaxSpeed) * 100, 100) + "%";
+        }
+
+        if (smoothedRawSpeedMs > 0.67) {
+            if (!isSwinging) {
+                isSwinging = true; gyroPeak = 0;
+                clearTimeout(resetUITimer);
+                wiiFeedback.style.color = "#ffaa00";
+                wiiFeedback.innerText = "SWINGING...";
+                wiiDistanceFeedback.innerText = "";
+            }
+            if (smoothedRawSpeedMs > gyroPeak) {
+                gyroPeak = smoothedRawSpeedMs;
+                wiiSpeedVal.innerText = gyroPeak.toFixed(2); 
+                wiiBarFill.style.width = Math.min((gyroPeak / wiiMaxSpeed) * 100, 100) + "%";
+                clearTimeout(swingTimer);
+                swingTimer = setTimeout(() => { if (isSwinging) finishWiiSwing(); }, 1200);
+            }
+        }
+    } else if (activeOverlay === 'play1') {
+        if (!isSwinging) {
+            playCalSpeedDisplay.innerText = smoothedRawSpeedMs.toFixed(2);
+        }
+        if (smoothedRawSpeedMs > 0.67) {
+            if (!isSwinging) {
+                isSwinging = true; gyroPeak = 0;
+                playCalFeedback.style.color = "#ffaa00";
+                playCalFeedback.innerText = "SWINGING...";
+            }
+            if (smoothedRawSpeedMs > gyroPeak) {
+                gyroPeak = smoothedRawSpeedMs;
+                playCalSpeedDisplay.innerText = gyroPeak.toFixed(2);
+                clearTimeout(swingTimer);
+                swingTimer = setTimeout(() => { 
+                    if (isSwinging) {
+                        isSwinging = false;
+                        if(navigator.vibrate) navigator.vibrate(50);
+                        setTimeout(() => { showPlayPhase(2); }, 1000);
+                    }
+                }, 1200);
+            }
+        }
+    }
+}
+
+
+// --- OVERLAY MANAGEMENT ---
+function applyOverlayStyles() {
+    if (inputMode === 'vision') {
+        wiiOverlay.style.background = 'rgba(0, 0, 0, 0.4)';
+        playOverlay.style.background = 'rgba(0, 0, 0, 0.4)';
+        visionContainer.style.display = 'block';
+    } else {
+        wiiOverlay.style.background = 'rgba(0, 0, 0, 0.95)';
+        playOverlay.style.background = 'rgba(0, 0, 0, 0.95)';
+        visionContainer.style.display = 'none';
+    }
+}
+
+// --- PLAY MODE LOGIC ---
+document.getElementById('playModeBtn').onclick = () => {
+    initInputSafe(() => {
+        applyOverlayStyles();
+        playOverlay.style.display = 'flex';
+        showPlayPhase(3); 
+    });
+};
+
+document.getElementById('closePlayBtn').onclick = () => {
+    activeOverlay = 'none';
+    playOverlay.style.display = 'none';
+    visionContainer.style.display = 'none';
+};
+
+document.getElementById('btnRecalibrate').onclick = () => {
+    showPlayPhase(1);
+};
+
+function showPlayPhase(phase) {
+    playPhase1.style.display = 'none';
+    playPhase2.style.display = 'none';
+    playPhase3.style.display = 'none';
+
+    if (phase === 1) {
+        activeOverlay = 'play1';
+        isSwinging = false; gyroPeak = 0; recentSpeeds = [0,0,0]; lastCamX = null;
+        playCalSpeedDisplay.innerText = "0.00";
+        playCalFeedback.innerText = "AWAITING SWING";
+        playCalFeedback.style.color = "transparent";
+        playPhase1.style.display = 'flex';
+    } else if (phase === 2) {
+        activeOverlay = 'play2'; 
+        playCalRecordedSpeed.innerText = gyroPeak.toFixed(2);
+        playPhase2.style.display = 'flex';
+    } else if (phase === 3) {
+        activeOverlay = 'play3'; 
+        lblPlayStimp.innerText = "STIMP: " + sysParams.stimp.toFixed(1);
+        lblPlayMult.innerText = "MULT: " + sysParams.speedMult.toFixed(2) + "x";
+        calculatePlayRecommendation();
+        playPhase3.style.display = 'flex';
+    }
+}
+
+document.getElementById('btnPlayCalibrate').onclick = () => {
+    let v_displayed = parseFloat(playCalRecordedSpeed.innerText);
+    let steps = parseFloat(document.getElementById('calSteps').value);
+    let upSlope = parseFloat(document.getElementById('calUpSlope').value);
+    let lrSlope = parseFloat(document.getElementById('calLRSlope').value);
+
+    if(steps <= 0) { alert("Steps must be greater than 0."); return; }
+    let effectiveSteps = steps * (1 + Math.abs(lrSlope) * 0.015);
+    let distM = effectiveSteps * 0.9144; 
+
+    let mu = 5.493 / sysParams.stimp;
+    let slopeAcc = 9.81 * Math.sin(upSlope * Math.PI / 180) * 0.714;
+    let totalAcc = mu + slopeAcc;
+
+    if (totalAcc <= 0.01) {
+        alert("PHYSICS ERROR: Ball would roll forever. Try a flatter putt.");
+        return; 
+    }
+
+    let trueVelocityRequired = Math.sqrt(2 * totalAcc * distM);
+    let newMult = trueVelocityRequired / v_displayed;
+
+    sysParams.speedMult = parseFloat(newMult.toFixed(2));
+    updateAllParamDisplays();
+    alert(`Putter Calibrated!\n\nTrue Speed Req: ${trueVelocityRequired.toFixed(2)} m/s\nSensor/Camera Read: ${v_displayed.toFixed(2)}\nNew Multiplier: ${sysParams.speedMult}x`);
+    showPlayPhase(3);
+};
+
+const playInputs = ['playSteps', 'playUpSlope', 'playLRSlope'];
+playInputs.forEach(id => {
+    document.getElementById(id).addEventListener('input', calculatePlayRecommendation);
+});
+
+function calculatePlayRecommendation() {
+    let steps = parseFloat(document.getElementById('playSteps').value) || 0;
+    let upSlope = parseFloat(document.getElementById('playUpSlope').value) || 0;
+    let lrSlope = parseFloat(document.getElementById('playLRSlope').value) || 0;
+
+    if(steps <= 0) { document.getElementById('playRecSpeed').innerText = "0.00"; return; }
+
+    let effectiveSteps = steps * (1 + Math.abs(lrSlope) * 0.015);
+    let distM = effectiveSteps * 0.9144;
+    let mu = 5.493 / sysParams.stimp;
+    let slopeAcc = 9.81 * Math.sin(upSlope * Math.PI / 180) * 0.714;
+    let totalAcc = mu + slopeAcc;
+
+    if (totalAcc <= 0.01) { document.getElementById('playRecSpeed').innerText = "TAP"; return; }
+    let recommendedVTrue = Math.sqrt(2 * totalAcc * distM);
+    let recommendedVSensor = recommendedVTrue / sysParams.speedMult;
+    document.getElementById('playRecSpeed').innerText = recommendedVSensor.toFixed(2);
+}
+
+document.getElementById('btnPracticePlay').onclick = () => {
+    let recSpeedText = document.getElementById('playRecSpeed').innerText;
+    if(recSpeedText === "TAP" || parseFloat(recSpeedText) <= 0) {
+        alert("This putt is extremely downhill and will roll entirely on its own! Just tap it.");
+        return;
+    }
+    sysParams.pwr = parseFloat(recSpeedText);
+    updateAllParamDisplays();
+
+    playOverlay.style.display = 'none';
+    initInputSafe(() => {
+        applyOverlayStyles();
+        openWiiScreen();
+    });
+};
+
+// --- WII PRACTICE LOGIC ---
+document.getElementById('practiceBtn').onclick = () => {
+    if (selectedPoints.length < 2) {
+        alert("Place ball and hole points first before practicing.");
+        return;
+    }
+    initInputSafe(() => {
+        applyOverlayStyles();
+        openWiiScreen();
+    });
+};
+
+document.getElementById('closeWiiBtn').onclick = () => {
+    activeOverlay = 'none';
+    wiiOverlay.style.display = 'none';
+    visionContainer.style.display = 'none';
+};
+
+function openWiiScreen() {
+    activeOverlay = 'wii';
+    isSwinging = false;
+    gyroPeak = 0;
+    recentSpeeds = [0, 0, 0];
+    lastCamX = null;
+
+    wiiOverlay.style.display = 'flex';
+    wiiSpeedVal.innerText = "0.00";
+    wiiBarFill.style.width = "0%";
+    wiiFeedback.style.color = "transparent";
+    wiiFeedback.innerText = "AWAITING SWING";
+    wiiDistanceFeedback.innerText = "";
+    wiiTargetVal.innerText = sysParams.pwr.toFixed(2);
+
+    const mu = 5.493 / sysParams.stimp;
+    const trueTargetPwr = sysParams.pwr * sysParams.speedMult;
+    const targetDistM = (trueTargetPwr * trueTargetPwr) / (2 * mu);
+
+    const shortDistM = Math.max(0, targetDistM - 0.6096); 
+    const longDistM = targetDistM + 0.6096; 
+
+    pwrShort = (Math.sqrt(2 * mu * shortDistM)) / sysParams.speedMult;
+    pwrLong = (Math.sqrt(2 * mu * longDistM)) / sysParams.speedMult;
+
+    wiiMaxSpeed = Math.max(pwrLong * 1.3, 2.0); 
+
+    let targetPct = (sysParams.pwr / wiiMaxSpeed) * 100;
+    let shortPct = (pwrShort / wiiMaxSpeed) * 100;
+    let longPct = (pwrLong / wiiMaxSpeed) * 100;
+
+    wiiTargetLine.style.left = Math.min(targetPct, 100) + "%";
+    wiiShortLine.style.left = Math.min(shortPct, 100) + "%";
+    wiiLongLine.style.left = Math.min(longPct, 100) + "%";
+}
+
+
+function finishWiiSwing() {
+    isSwinging = false;
+    clearTimeout(swingTimer);
+    let finalSpeed = gyroPeak; 
+
+    if (finalSpeed > 0.2) {
+        if (navigator.vibrate) navigator.vibrate(50); 
+        const mu = 5.493 / sysParams.stimp;
+        let trueTargetPwr = sysParams.pwr * sysParams.speedMult;
+        let trueSwingPwr = finalSpeed * sysParams.speedMult;
+
+        let targetDistM = (trueTargetPwr * trueTargetPwr) / (2 * mu);
+        let swingDistM = (trueSwingPwr * trueSwingPwr) / (2 * mu);
+
+        let diffM = swingDistM - targetDistM;
+        let diffFt = Math.abs(diffM * 3.28084).toFixed(1);
+
+        let distText = diffM > 0 ? `${diffFt} ft PAST TARGET` : `${diffFt} ft SHORT OF TARGET`;
+        if (Math.abs(diffM) < 0.05) distText = "DEAD CENTER";
+
+        if (finalSpeed >= pwrShort && finalSpeed <= pwrLong) {
+            wiiFeedback.style.color = "#00ff00";
+            wiiFeedback.style.textShadow = "0 0 20px #00ff00";
+            wiiFeedback.innerText = "PERFECT!";
+        } else if (finalSpeed > pwrLong) {
+            wiiFeedback.style.color = "#ff4444";
+            wiiFeedback.style.textShadow = "0 0 20px #ff4444";
+            wiiFeedback.innerText = "TOO HARD!";
+        } else {
+            wiiFeedback.style.color = "#00ccff";
+            wiiFeedback.style.textShadow = "0 0 20px #00ccff";
+            wiiFeedback.innerText = "TOO SOFT!";
+        }
+
+        wiiDistanceFeedback.innerText = distText;
+
+        clearTimeout(resetUITimer);
+        resetUITimer = setTimeout(() => { 
+            if (activeOverlay === 'wii') {
+                wiiFeedback.style.color = "transparent";
+                wiiFeedback.innerText = "AWAITING SWING";
+                wiiDistanceFeedback.innerText = "";
+                wiiBarFill.style.width = "0%";
+                wiiSpeedVal.innerText = "0.00";
+            }
+        }, 4000);
+
+    } else {
+        openWiiScreen(); 
+    }
+}
+
+// --- FILE LOADERS & REST OF 3D ENGINE ---
+document.getElementById('plyInput').onchange = (e) => {
+const file = e.target.files[0];
+if (!file) return;
+currentMode = 'ply';
+document.getElementById('imgConfig').style.display = 'none';
+
+const reader = new FileReader();
+reader.onload = (ev) => { originalFileDataBase64 = ev.target.result; };
+reader.readAsDataURL(file);
+
+const loader = new PLYLoader();
+loader.load(URL.createObjectURL(file), (geo) => {
+lastGeo = geo; processTerrainPLY(); enableControls();
+});
+e.target.value = ''; 
+};
+
+document.getElementById('imgInput').onchange = (e) => {
+const file = e.target.files[0];
+if (!file) return;
+currentMode = 'img';
+document.getElementById('imgConfig').style.display = 'block';
+
+const reader = new FileReader();
+reader.onload = (event) => {
+originalFileDataBase64 = event.target.result;
+const img = new Image();
+img.onload = () => { currentImage = img; processTerrainImage(); enableControls(); };
+img.src = event.target.result;
+};
+reader.readAsDataURL(file);
+e.target.value = ''; 
+};
+
+document.getElementById('saveBtn').onclick = async () => {
+if (!currentMode && sysParams.speedMult === 1.0) {
+alert("Nothing to save yet. Load a green or calibrate the putter first.");
+return;
+}
+try {
+const savedParams = {
+frontYds: sysParams.frontYds, backYds: sysParams.backYds,
+slope: sysParams.slope, smooth: sysParams.smooth, stimp: sysParams.stimp,
+speedMult: sysParams.speedMult 
+};
+const payload = { version: 1, mode: currentMode, fileData: originalFileDataBase64, params: savedParams };
+const fileObj = new File([JSON.stringify(payload)], 'green_physics_hole.json', { type: 'application/json' });
+
+if (navigator.canShare && navigator.canShare({ files: [fileObj] })) {
+await navigator.share({ files: [fileObj], title: 'Green Physics Save', text: 'Saving your data...' });
+} else {
+const url = URL.createObjectURL(fileObj);
+const a = document.createElement('a');
+a.style.display = 'none'; a.href = url; a.download = 'green_physics_hole.json';
+document.body.appendChild(a); a.click();
+setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
+}
+} catch (error) { if (error.name !== 'AbortError') console.error(error); }
+};
+
+document.getElementById('loadSaveInput').onchange = (e) => {
+const file = e.target.files[0];
+if (!file) return;
+const reader = new FileReader();
+reader.onload = (event) => {
+try {
+const data = JSON.parse(event.target.result);
+sysParams.frontYds = data.params.frontYds || 100.0;
+sysParams.backYds = data.params.backYds || 130.0;
+sysParams.slope = data.params.slope || 3.0;
+sysParams.smooth = data.params.smooth || 20;
+sysParams.stimp = data.params.stimp || 10.0;
+sysParams.speedMult = data.params.speedMult || 1.0;
+sysParams.aim = 0.0; sysParams.pwr = 3.2;
+
+currentMode = data.mode;
+originalFileDataBase64 = data.fileData;
+
+updateAllParamDisplays();
+
+if (currentMode === 'img' && originalFileDataBase64) {
+document.getElementById('imgConfig').style.display = 'block';
+const img = new Image();
+img.onload = () => { currentImage = img; processTerrainImage(); enableControls(); };
+img.src = originalFileDataBase64;
+} else if (currentMode === 'ply' && originalFileDataBase64) {
+document.getElementById('imgConfig').style.display = 'none';
+const loader = new PLYLoader();
+loader.load(originalFileDataBase64, (geo) => {
+lastGeo = geo; processTerrainPLY(); enableControls();
+});
+}
+} catch(err) { console.error(err); alert("Invalid or corrupted save file."); }
+};
+reader.readAsText(file);
+e.target.value = ''; 
+};
+
+function enableControls() {
+document.getElementById('resetBtn').style.display = 'block';
+document.getElementById('optimizeBtn').style.display = 'block';
+document.getElementById('saveBtn').style.display = 'block';
+document.getElementById('practiceBtn').style.display = 'block';
+resetPutt();
+document.getElementById('results').innerHTML = "Select ball start position.";
+}
+
+document.querySelectorAll('.adj-btn').forEach(btn => {
+btn.addEventListener('click', (e) => {
+if(e.target.classList.contains('axis-btn') || e.target.classList.contains('mode-btn')) return; 
+const param = e.target.getAttribute('data-param');
+const change = parseFloat(e.target.getAttribute('data-val'));
+updateParam(param, change);
+});
+});
+
+function updateParam(param, change) {
+let newVal = sysParams[param] + change;
+if (param === 'smooth') newVal = Math.max(1, Math.round(newVal));
+else if (param === 'frontYds' || param === 'backYds') newVal = Math.max(1, newVal);
+else if (param === 'slope') newVal = Math.max(0, newVal);
+else if (param === 'stimp') newVal = Math.max(1, newVal);
+else if (param === 'pwr') newVal = Math.max(0.1, newVal);
+else if (param === 'speedMult') newVal = Math.max(0.01, newVal); 
+
+sysParams[param] = parseFloat(newVal.toFixed(3));
+updateAllParamDisplays();
+
+if (['frontYds', 'backYds', 'slope'].includes(param) && currentMode === 'img') processTerrainImage();
+if (param === 'smooth') currentMode === 'ply' ? processTerrainPLY() : processTerrainImage();
+
+if (param === 'stimp' && selectedPoints.length === 2) autoCalculatePower();
+if (selectedPoints.length === 2 && ['pwr', 'aim', 'stimp', 'speedMult'].includes(param)) calculatePutt();
+
+if (activeOverlay === 'play3' && param === 'stimp') {
+lblPlayStimp.innerText = "STIMP: " + sysParams.stimp.toFixed(1);
+calculatePlayRecommendation();
+}
+if (activeOverlay === 'play3' && param === 'speedMult') {
+lblPlayMult.innerText = "MULT: " + sysParams.speedMult.toFixed(2) + "x";
+calculatePlayRecommendation();
+}
+}
+
+function updateAllParamDisplays() {
+document.getElementById('frontYdsVal').innerText = sysParams.frontYds.toFixed(1);
+document.getElementById('backYdsVal').innerText = sysParams.backYds.toFixed(1);
+document.getElementById('slopeVal').innerText = sysParams.slope.toFixed(1) + '°';
+document.getElementById('smoothVal').innerText = sysParams.smooth;
+document.getElementById('stimpVal').innerText = sysParams.stimp.toFixed(1);
+document.getElementById('aimVal').innerText = sysParams.aim.toFixed(1) + '°';
+document.getElementById('pwrVal').innerText = sysParams.pwr.toFixed(2);
+document.getElementById('speedMultVal').innerText = sysParams.speedMult.toFixed(2) + 'x';
+}
+
+function processTerrainImage() {
+if (!currentImage) return;
+if (meshSurface) scene.remove(meshSurface);
+
+const segments = 128;
+const canvas = document.createElement('canvas');
+const ctx = canvas.getContext('2d');
+canvas.width = segments + 1; canvas.height = segments + 1;
+ctx.drawImage(currentImage, 0, 0, canvas.width, canvas.height);
+
+let imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+let pixels = imageData.data;
+
+if (sysParams.smooth > 0) pixels = applyBoxBlur(pixels, canvas.width, canvas.height, sysParams.smooth);
+
+const depthYds = Math.abs(sysParams.backYds - sysParams.frontYds) || 30;
+const depthMeters = depthYds * 0.9144; 
+const widthMeters = depthMeters * (currentImage.width / currentImage.height);
+
+const geometry = new THREE.PlaneGeometry(widthMeters, depthMeters, segments, segments);
+geometry.rotateX(-Math.PI / 2); 
+
+const positions = geometry.attributes.position.array;
+const radians = sysParams.slope * (Math.PI / 180);
+const heightFactor = Math.tan(radians) * widthMeters;
+
+for (let i = 0; i < positions.length; i += 3) {
+const pixelIdx = (i / 3) * 4;
+const r = pixels[pixelIdx] / 255;
+const b = pixels[pixelIdx + 2] / 255;
+const normalizedHeight = (r - b); 
+positions[i + 1] = normalizedHeight * (heightFactor / 2);
+}
+
+geometry.computeVertexNormals();
+const texture = new THREE.CanvasTexture(canvas);
+const material = new THREE.MeshStandardMaterial({ map: texture, side: THREE.DoubleSide, roughness: 0.8 });
+meshSurface = new THREE.Mesh(geometry, material);
+scene.add(meshSurface);
+}
+
+function applyBoxBlur(data, width, height, radius) {
+const result = new Uint8ClampedArray(data);
+for (let y = 0; y < height; y++) {
+for (let x = 0; x < width; x++) {
+let r = 0, g = 0, b = 0, count = 0;
+for (let dy = -radius; dy <= radius; dy++) {
+for (let dx = -radius; dx <= radius; dx++) {
+const nx = x + dx, ny = y + dy;
+if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+const idx = (ny * width + nx) * 4;
+r += data[idx]; g += data[idx + 1]; b += data[idx + 2];
+count++;
+}
+}
+}
+const resIdx = (y * width + x) * 4;
+result[resIdx] = r / count; result[resIdx + 1] = g / count; result[resIdx + 2] = b / count;
+}
+}
+return result;
+}
+
+function processTerrainPLY() {
+if (!lastGeo) return;
+if (meshSurface) scene.remove(meshSurface);
+const pos = lastGeo.attributes.position.array;
+const grid = {}, res = 0.05; 
+for (let i = 0; i < pos.length; i += 3) {
+const x = pos[i], y = pos[i+1], z = pos[i+2];
+if (y < -3 || y > 3) continue; 
+const gx = Math.round(x / res), gz = Math.round(z / res);
+const key = `${gx},${gz}`;
+if (!grid[key]) grid[key] = [];
+grid[key].push(y);
+}
+let heightMap = {};
+for (let key in grid) {
+const h = grid[key].sort((a,b) => a-b);
+heightMap[key] = h[Math.floor(h.length / 2)]; 
+}
+for(let p=0; p < sysParams.smooth; p++) {
+let blurred = {};
+for (let key in heightMap) {
+const [gx, gz] = key.split(',').map(Number);
+let sum = 0, weight = 0;
+for(let i=-1; i<=1; i++) {
+for(let j=-1; j<=1; j++) {
+const nKey = `${gx+i},${gz+j}`;
+if(heightMap[nKey] !== undefined) {
+const w = (i===0 && j===0) ? 4 : (i===0 || j===0 ? 2 : 1);
+sum += heightMap[nKey] * w; weight += w;
+}
+}
+}
+blurred[key] = sum / weight;
+}
+heightMap = blurred;
+}
+const meshGeo = new THREE.BufferGeometry();
+const verts = [], indices = [], keyToIdx = {};
+let idx = 0;
+for (let key in heightMap) {
+const [gx, gz] = key.split(',').map(Number);
+verts.push(gx * res, heightMap[key], gz * res);
+keyToIdx[key] = idx++;
+}
+for (let key in heightMap) {
+const [gx, gz] = key.split(',').map(Number);
+const k1 = `${gx},${gz}`, k2 = `${gx+1},${gz}`, k3 = `${gx},${gz+1}`, k4 = `${gx+1},${gz+1}`;
+if (keyToIdx[k1]!==undefined && keyToIdx[k2]!==undefined && keyToIdx[k3]!==undefined) indices.push(keyToIdx[k1], keyToIdx[k3], keyToIdx[k2]);
+if (keyToIdx[k2]!==undefined && keyToIdx[k3]!==undefined && keyToIdx[k4]!==undefined) indices.push(keyToIdx[k2], keyToIdx[k3], keyToIdx[k4]);
+}
+meshGeo.setIndex(indices);
+meshGeo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+meshGeo.computeVertexNormals();
+meshSurface = new THREE.Mesh(meshGeo, new THREE.MeshStandardMaterial({ color: 0x245432, roughness: 0.8, side: THREE.DoubleSide }));
+scene.add(meshSurface);
+}
+
+function simulateHeadless(testAim, testSensorPwr, ballStart, holePos, stimp) {
+let truePwr = testSensorPwr * sysParams.speedMult;
+let currentBallPos = ballStart.clone();
+let vel = new THREE.Vector3().subVectors(holePos, ballStart).setY(0);
+vel.applyAxisAngle(new THREE.Vector3(0, 1, 0), (testAim * Math.PI) / 180);
+vel.normalize().multiplyScalar(truePwr);
+
+const dt = 0.012, g = 9.81, mu = 5.493 / stimp;
+const cupRad = 0.054;
+let isMade = false;
+
+for (let i = 0; i < 2800; i++) {
+raycaster.set(currentBallPos.clone().add(new THREE.Vector3(0, 1, 0)), new THREE.Vector3(0, -1, 0));
+const hits = raycaster.intersectObject(meshSurface);
+if (hits.length > 0) {
+const normal = hits[0].face.normal;
+let slopeAcc = new THREE.Vector3(0, -g, 0).projectOnPlane(normal).multiplyScalar(0.714);
+let frictionAcc = vel.clone().normalize().multiplyScalar(-mu);
+vel.add(slopeAcc.add(frictionAcc).multiplyScalar(dt));
+currentBallPos.y = hits[0].point.y + 0.021;
+}
+currentBallPos.add(vel.clone().multiplyScalar(dt));
+
+if (currentBallPos.distanceTo(holePos) < cupRad && vel.length() < 1.45) {
+isMade = true; break;
+}
+if (vel.length() < 0.02) break;
+}
+
+const targetDir = new THREE.Vector3().subVectors(holePos, ballStart).setY(0).normalize();
+const perpLine = new THREE.Vector3(targetDir.z, 0, -targetDir.x);
+const ballToFinal = new THREE.Vector3().subVectors(currentBallPos, ballStart).setY(0);
+
+return {
+isMade: isMade,
+finalPos: currentBallPos.clone(),
+distToHole: currentBallPos.distanceTo(holePos),
+latMiss: ballToFinal.dot(perpLine) 
+};
+}
+
+function drawFallLine(holePos) {
+if (fallLineArrow) scene.remove(fallLineArrow);
+raycaster.set(holePos.clone().add(new THREE.Vector3(0, 5, 0)), new THREE.Vector3(0, -1, 0));
+const hits = raycaster.intersectObject(meshSurface);
+if (hits.length > 0) {
+const normal = hits[0].face.normal;
+let downhill = new THREE.Vector3(0, -1, 0).projectOnPlane(normal).normalize();
+const origin = holePos.clone().add(new THREE.Vector3(0, 0.1, 0)).add(downhill.clone().multiplyScalar(-0.4));
+fallLineArrow = new THREE.ArrowHelper(downhill, origin, 0.8, 0xff00ff, 0.15, 0.1);
+scene.add(fallLineArrow);
+}
+}
+
+function autoCalculatePower() {
+if (selectedPoints.length < 2) return;
+const dist = selectedPoints[0].distanceTo(selectedPoints[1]);
+const mu = 5.493 / sysParams.stimp;
+const trueReqPower = Math.sqrt(2 * mu * (dist + 0.22));
+
+sysParams.pwr = parseFloat((trueReqPower / sysParams.speedMult).toFixed(2));
+updateAllParamDisplays();
+}
+
+function calculatePutt() {
+if (ballPathMesh) scene.remove(ballPathMesh);
+if (flatRefLine) scene.remove(flatRefLine);
+pathData = [];
+const ballStart = selectedPoints[0].clone();
+const holePos = selectedPoints[1].clone();
+
+let sensorPuttPower = sysParams.pwr;
+let truePuttPower = sensorPuttPower * sysParams.speedMult;
+
+let vel = new THREE.Vector3().subVectors(holePos, ballStart);
+vel.y = 0;
+vel.applyAxisAngle(new THREE.Vector3(0, 1, 0), (sysParams.aim * Math.PI) / 180);
+vel.normalize().multiplyScalar(truePuttPower);
+
+const dt = 0.012, g = 9.81, mu = 5.493 / sysParams.stimp; 
+const ballRad = 0.021, cupRad = 0.054;
+const flatDistM = (truePuttPower * truePuttPower) / (2 * mu);
+const flatDistFt = (flatDistM * 3.28084).toFixed(1);
+
+const flatEnd = ballStart.clone().add(vel.clone().normalize().multiplyScalar(flatDistM));
+const flatPoints = [ballStart.clone().add(new THREE.Vector3(0, 0.08, 0)), flatEnd.add(new THREE.Vector3(0, 0.08, 0))];
+flatRefLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints(flatPoints), new THREE.LineDashedMaterial({ color: 0xffffff, dashSize: 0.1, gapSize: 0.05 }));
+flatRefLine.computeLineDistances();
+scene.add(flatRefLine);
+
+let currentBallPos = ballStart.clone();
+let currentVel = vel.clone();
+let isMade = false;
+
+for (let i = 0; i < 2800; i++) {
+pathData.push(currentBallPos.clone());
+raycaster.set(currentBallPos.clone().add(new THREE.Vector3(0, 1, 0)), new THREE.Vector3(0, -1, 0));
+const hits = raycaster.intersectObject(meshSurface);
+if (hits.length > 0) {
+const normal = hits[0].face.normal;
+let slopeAcc = new THREE.Vector3(0, -g, 0).projectOnPlane(normal).multiplyScalar(0.714);
+let frictionAcc = currentVel.clone().normalize().multiplyScalar(-mu);
+currentVel.add(slopeAcc.add(frictionAcc).multiplyScalar(dt));
+currentBallPos.y = hits[0].point.y + ballRad;
+}
+currentBallPos.add(currentVel.clone().multiplyScalar(dt));
+if (currentBallPos.distanceTo(holePos) < cupRad && currentVel.length() < 1.45) {
+isMade = true; pathData.push(holePos.clone()); break;
+}
+if (currentVel.length() < 0.02) break;
+}
+ballPathMesh = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pathData), pathData.length, 0.015, 8, false), new THREE.MeshBasicMaterial({ color: isMade ? 0x00ff00 : 0xffaa00 }));
+scene.add(ballPathMesh);
+
+const finalPos = pathData[pathData.length - 1];
+const pinDistFt = (ballStart.distanceTo(holePos) * 3.28084).toFixed(1);
+let totalTravelM = 0;
+for(let i=1; i<pathData.length; i++) totalTravelM += pathData[i].distanceTo(pathData[i-1]);
+const targetVec = new THREE.Vector3().subVectors(holePos, ballStart).setY(0);
+
+const perpLine = new THREE.Vector3(targetVec.clone().normalize().z, 0, -targetVec.clone().normalize().x);
+const ballToFinalVec = new THREE.Vector3().subVectors(finalPos, ballStart).setY(0);
+const latOffM = ballToFinalVec.dot(perpLine); 
+
+document.getElementById('results').innerHTML = `
+<div class="status-header"><span class="${isMade ? 'status-in' : 'status-out'}">${isMade ? '● CUP IN' : '● MISSED'}</span></div>
+<div class="data-grid">
+<div class="data-item"><span class="label-sm">Sensor Target</span><span class="val">${sensorPuttPower.toFixed(2)}</span></div>
+<div class="data-item"><span class="label-sm">Pin Dist</span><span class="val">${pinDistFt} ft</span></div>
+<div class="data-item"><span class="label-sm">Flat Dist</span><span class="val">${flatDistFt} ft</span></div>
+<div class="data-item"><span class="label-sm">Proj Offset</span><span class="val">${(Math.abs(latOffM) * 39.37).toFixed(1)}" ${latOffM >= 0 ? "L" : "R"}</span></div>
+</div>`;
+ghostBall.position.copy(pathData[0]); ghostBall.visible = true;
+}
+
+function optimizePutt() {
+if (selectedPoints.length < 2) return;
+const ballStart = selectedPoints[0];
+const holePos = selectedPoints[1];
+
+let pwr = sysParams.pwr; 
+let aim1 = sysParams.aim;
+let aim2 = aim1 + 1.0; 
+
+let res1 = simulateHeadless(aim1, pwr, ballStart, holePos, sysParams.stimp);
+if (res1.isMade) return applyAndRender(aim1, pwr);
+
+let res2 = simulateHeadless(aim2, pwr, ballStart, holePos, sysParams.stimp);
+
+const maxIters = 12;
+for (let i = 0; i < maxIters; i++) {
+if (res2.isMade) return applyAndRender(aim2, pwr);
+
+let denominator = (res2.latMiss - res1.latMiss);
+if (Math.abs(denominator) < 0.0001) break; 
+
+let nextAim = aim2 - res2.latMiss * ((aim2 - aim1) / denominator);
+nextAim = Math.max(-45, Math.min(45, nextAim)); 
+
+let targetVec = new THREE.Vector3().subVectors(holePos, ballStart).setY(0);
+let actualTravelVec = new THREE.Vector3().subVectors(res2.finalPos, ballStart).setY(0);
+
+let truePwr = pwr * sysParams.speedMult;
+truePwr += (targetVec.length() - actualTravelVec.length()) * 0.45; 
+truePwr = Math.max(0.5, truePwr);
+pwr = truePwr / sysParams.speedMult;
+
+aim1 = aim2;
+res1 = res2;
+aim2 = nextAim;
+res2 = simulateHeadless(aim2, pwr, ballStart, holePos, sysParams.stimp);
+}
+
+applyAndRender(aim2, pwr);
+}
+
+function applyAndRender(bestAim, bestPwr) {
+sysParams.aim = parseFloat(bestAim.toFixed(2));
+sysParams.pwr = parseFloat(bestPwr.toFixed(2));
+updateAllParamDisplays();
+calculatePutt(); 
+}
+
+function onPick(e) {
+if (selectedPoints.length >= 2) return;
+mouse.x = (e.clientX / window.innerWidth) * 2 - 1; mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+raycaster.setFromCamera(mouse, camera);
+const hits = raycaster.intersectObject(meshSurface);
+if (hits.length > 0) {
+const p = hits[0].point; selectedPoints.push(p);
+const dot = new THREE.Mesh(new THREE.SphereGeometry(0.12), new THREE.MeshBasicMaterial({color: selectedPoints.length===1?0xffffff:0xff0000}));
+dot.position.copy(p).add(new THREE.Vector3(0, 0.05, 0));
+scene.add(dot); markers.push(dot);
+if (selectedPoints.length === 2) { drawFallLine(p); autoCalculatePower(); calculatePutt(); }
+}
+}
+
+function resetPutt() {
+selectedPoints = []; markers.forEach(m => scene.remove(m)); markers = [];
+if(ballPathMesh) scene.remove(ballPathMesh); if(flatRefLine) scene.remove(flatRefLine); if(fallLineArrow) scene.remove(fallLineArrow);
+ghostBall.visible = false; 
+sysParams.aim = 0.0;
+updateAllParamDisplays();
+document.getElementById('results').innerHTML = "Select Ball location.";
+}
+
+document.getElementById('optimizeBtn').onclick = optimizePutt;
+document.getElementById('resetBtn').onclick = resetPutt;
+
+function animate() {
+requestAnimationFrame(animate);
+if (ghostBall.visible && pathData.length > 0) {
+let ghostIdx = (Math.floor(Date.now() / 20)) % pathData.length;
+ghostBall.position.copy(pathData[ghostIdx]);
+}
+controls.update(); renderer.render(scene, camera);
+}
+
+window.addEventListener('resize', () => {
+camera.aspect = window.innerWidth / window.innerHeight;
+camera.updateProjectionMatrix();
+renderer.setSize(window.innerWidth, window.innerHeight);
+});
+</script>
 </body>
 </html>
