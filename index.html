@@ -255,10 +255,8 @@ label { font-size: 10px; color: #aaa; text-transform: uppercase; letter-spacing:
 
 <div class="slider-group vision-only" style="display:none;">
 <label>Camera Tracking Setup</label>
-<div style="display:flex; gap: 5px; margin-top:5px;">
-    <button id="btnOpenColorCal" class="btn" style="background:#ff9800; flex: 2; padding:10px; border-radius:8px;">TRAIN MARKER COLOR</button>
-    <button id="btnFlipCam" class="btn" style="background:#444; flex: 1; padding:10px; border-radius:8px;">FLIP CAM</button>
-</div>
+<button id="btnFlipCam" class="btn" style="background:#673ab7; width:100%; padding:10px; border-radius:8px; margin-top:5px; margin-bottom:5px;">FLIP CAMERA (FRONT/BACK)</button>
+<button id="btnOpenColorCal" class="btn" style="background:#ff9800; width:100%; padding:10px; border-radius:8px;">TRAIN MARKER COLOR</button>
 </div>
 
 <div class="slider-group">
@@ -339,7 +337,8 @@ let sysParams = {
 let inputMode = 'gyro'; // 'gyro' or 'vision'
 let isGyroInit = false;
 let isCamInit = false;
-let currentFacingMode = "environment"; // Allow flipping camera
+let currentFacingMode = 'environment'; // environment (back) or user (front)
+let currentStream = null;
 let gyroPeak = 0;
 let isSwinging = false;
 let swingTimer = null;
@@ -356,8 +355,9 @@ const vCtx = vCanvas.getContext('2d', { willReadFrequently: true });
 let lastCamX = null, lastCamY = null, lastCamTime = null;
 
 // New Dynamic Color Training Vars
-let targetColorRatios = { r: 0.60, g: 0.20, b: 0.20 }; // Default
-const CAL_TOLERANCE_SQ = 0.04; 
+// Default to red ratios just in case they don't calibrate
+let targetColorRatios = { r: 0.60, g: 0.20, b: 0.20 }; 
+const CAL_TOLERANCE_SQ = 0.04; // Allowable distance in ratio space
 
 // New Vision State Machine Vars
 let vState = 'IDLE'; // IDLE, STILL, READY, SWINGING, FINISHED
@@ -376,12 +376,12 @@ const colorCalOverlay = document.getElementById('colorCalOverlay');
 const calCanvas = document.getElementById('calCanvas');
 const calCtx = calCanvas.getContext('2d', { willReadFrequently: true });
 const btnOpenColorCal = document.getElementById('btnOpenColorCal');
+const btnFlipCam = document.getElementById('btnFlipCam');
 const btnStartCalTimer = document.getElementById('btnStartCalTimer');
 const btnConfirmColor = document.getElementById('btnConfirmColor');
 const closeCalBtn = document.getElementById('closeCalBtn');
 const calInstText = document.getElementById('calInstText');
 const colorSwatch = document.getElementById('colorSwatch');
-const btnFlipCam = document.getElementById('btnFlipCam');
 let calTimer = null;
 let isCalLive = false;
 let capturedImageData = null;
@@ -411,6 +411,16 @@ const lblPlayMult = document.getElementById('lblPlayMult');
 
 document.getElementById('uiToggle').onclick = () => uiPanel.classList.toggle('visible');
 
+// Camera Toggle Logic
+btnFlipCam.onclick = () => {
+    currentFacingMode = currentFacingMode === 'environment' ? 'user' : 'environment';
+    if (currentStream) {
+        currentStream.getTracks().forEach(track => track.stop());
+    }
+    isCamInit = false; // Force re-init to grab the new camera
+    initInputSafe(() => console.log("Camera flipped to: " + currentFacingMode));
+};
+
 // Input Mode Toggle
 document.querySelectorAll('.mode-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
@@ -430,16 +440,6 @@ document.querySelectorAll('.axis-btn').forEach(btn => {
         e.target.style.background = activeAxes[axis] ? '#28a745' : '#333';
     });
 });
-
-btnFlipCam.onclick = () => {
-    currentFacingMode = currentFacingMode === "environment" ? "user" : "environment";
-    if (isCamInit) {
-        let stream = video.srcObject;
-        if (stream) stream.getTracks().forEach(t => t.stop());
-        isCamInit = false;
-        initInputSafe(() => { alert("Camera flipped!"); });
-    }
-};
 
 init();
 updateAllParamDisplays(); 
@@ -508,6 +508,7 @@ function initInputSafe(callback) {
             navigator.mediaDevices.getUserMedia({ 
                 video: { facingMode: currentFacingMode, width: { ideal: 640 }, height: { ideal: 480 } } 
             }).then(stream => {
+                currentStream = stream;
                 video.srcObject = stream;
                 video.play();
                 isCamInit = true;
@@ -713,69 +714,66 @@ function processCamFrame() {
 
             if (lastCamX !== null && lastCamTime !== null) {
                 const dt = (curTime - lastCamTime) / 1000;
-                // Only process frame drops if dt isn't incredibly huge (avoids pausing glitches)
-                if (dt < 0.5) {
-                    const distPx = Math.sqrt((curX - lastCamX)**2 + (curY - lastCamY)**2);
-                    let speedPxSec = distPx / dt;
-                    
-                    // STATE MACHINE LOGIC
-                    if (speedPxSec < 80) { 
-                        // Putter is relatively still
-                        if (vState === 'IDLE' || vState === 'FINISHED' || vState === 'SWINGING') {
-                            vState = 'STILL';
-                            stillStart = curTime;
-                        } else if (vState === 'STILL' && (curTime - stillStart > 1000)) { 
-                            // Held still for 1 full second
-                            vState = 'READY';
-                            addressX = curX;
-                            addressY = curY;
+                const distPx = Math.sqrt((curX - lastCamX)**2 + (curY - lastCamY)**2);
+                let speedPxSec = distPx / dt;
+                
+                // STATE MACHINE LOGIC
+                if (speedPxSec < 80) { 
+                    // Putter is relatively still
+                    if (vState === 'IDLE' || vState === 'SWINGING') {
+                        vState = 'STILL';
+                        stillStart = curTime;
+                    } else if (vState === 'STILL' && (curTime - stillStart > 3000)) { 
+                        // Held still for 3 full seconds to lock address point
+                        vState = 'READY';
+                        addressX = curX;
+                        addressY = curY;
+                        if (navigator.vibrate) navigator.vibrate([30, 50, 30]); // Haptic feedback on lock
+                    }
+                } else { 
+                    // Putter is moving
+                    if (vState === 'STILL') {
+                        vState = 'IDLE';
+                    } else if (vState === 'READY') {
+                        // If it moves away from address by 30+ pixels, backswing has started
+                        if (Math.abs(curX - addressX) > 30) {
+                            vState = 'SWINGING';
                         }
-                    } else { 
-                        // Putter is moving
-                        if (vState === 'STILL') {
-                            vState = 'IDLE';
-                        } else if (vState === 'READY') {
-                            // If it moves away from address by 30+ pixels, backswing has started
-                            if (Math.abs(curX - addressX) > 30) {
-                                vState = 'SWINGING';
-                            }
-                        } else if (vState === 'SWINGING') {
-                            // Did it cross the X-plane of the original address position?
-                            let crossed = (lastCamX <= addressX && curX >= addressX) ||
-                                          (lastCamX >= addressX && curX <= addressX);
+                    } else if (vState === 'SWINGING') {
+                        // Feed real-time speed to UI during continuous stroke
+                        let liveSpeed = speedPxSec / 1000.0;
+                        if (activeOverlay === 'wii') {
+                            wiiSpeedVal.innerText = liveSpeed.toFixed(2);
+                            wiiBarFill.style.width = Math.min((liveSpeed / wiiMaxSpeed) * 100, 100) + "%";
+                        } else if (activeOverlay === 'play1') {
+                            playCalSpeedDisplay.innerText = liveSpeed.toFixed(2);
+                        }
 
-                            if (crossed) {
-                                // Multiply base vision speed to clear the unified pipeline thresholds
-                                curRawSpeedMs = (speedPxSec / 1000.0) * 4.0; 
-                                
-                                // Prevent micro-jitter from falsely triggering impact
-                                if (curRawSpeedMs > 0.5) {
-                                    vState = 'FINISHED'; 
-                                    
-                                    // Visual Flash on Canvas
-                                    vCtx.fillStyle = "rgba(255, 255, 255, 0.3)";
-                                    vCtx.fillRect(0, 0, vCanvas.width, vCanvas.height);
+                        // Did it cross the X-plane of the original address position?
+                        let crossed = (lastCamX <= addressX && curX >= addressX) ||
+                                      (lastCamX >= addressX && curX <= addressX);
 
-                                    // Reset state machine after shot completes
-                                    setTimeout(() => { if (vState === 'FINISHED') vState = 'IDLE'; }, 1500);
-                                }
-                            }
+                        if (crossed && speedPxSec > 200) {
+                            // IMPACT! Register official speed at the exact point of crossing
+                            curRawSpeedMs = speedPxSec / 1000.0;
+                            vState = 'FINISHED'; 
+                            
+                            // Visual Flash on Canvas
+                            vCtx.fillStyle = "rgba(255, 255, 255, 0.3)";
+                            vCtx.fillRect(0, 0, vCanvas.width, vCanvas.height);
+
+                            // Reset state machine after shot completes
+                            setTimeout(() => { vState = 'IDLE'; }, 1500);
                         }
                     }
                 }
             }
             lastCamX = curX; lastCamY = curY; lastCamTime = curTime;
         } else {
-            // LOST TRACKING (Motion Blur Dropout)
-            // If we are actively swinging, DO NOT reset lastCamX!
-            // This allows the engine to calculate speed across the blurry impact gap when the dot reappears.
-            if (vState !== 'SWINGING') {
-                lastCamX = null;
-                lastCamTime = null;
-            }
+            lastCamX = null;
         }
 
-        // Only send speed to UI processing if we captured a true impact crossing
+        // Only send speed to main swing processor if we captured a true impact crossing
         if (curRawSpeedMs > 0) {
             processSwingSpeed(curRawSpeedMs);
         }
@@ -810,7 +808,7 @@ function processSwingSpeed(curRawSpeedMs) {
     }
 
     if (activeOverlay === 'wii') {
-        if (!isSwinging) {
+        if (!isSwinging && inputMode === 'gyro') { // Vision handles its own live feed
             wiiSpeedVal.innerText = smoothedRawSpeedMs.toFixed(2);
             wiiBarFill.style.width = Math.min((smoothedRawSpeedMs / wiiMaxSpeed) * 100, 100) + "%";
         }
@@ -825,14 +823,16 @@ function processSwingSpeed(curRawSpeedMs) {
             }
             if (smoothedRawSpeedMs > gyroPeak) {
                 gyroPeak = smoothedRawSpeedMs;
-                wiiSpeedVal.innerText = gyroPeak.toFixed(2); 
-                wiiBarFill.style.width = Math.min((gyroPeak / wiiMaxSpeed) * 100, 100) + "%";
+                if(inputMode === 'gyro') {
+                    wiiSpeedVal.innerText = gyroPeak.toFixed(2); 
+                    wiiBarFill.style.width = Math.min((gyroPeak / wiiMaxSpeed) * 100, 100) + "%";
+                }
                 clearTimeout(swingTimer);
                 swingTimer = setTimeout(() => { if (isSwinging) finishWiiSwing(); }, 1200);
             }
         }
     } else if (activeOverlay === 'play1') {
-        if (!isSwinging) {
+        if (!isSwinging && inputMode === 'gyro') {
             playCalSpeedDisplay.innerText = smoothedRawSpeedMs.toFixed(2);
         }
         if (smoothedRawSpeedMs > 0.67) {
@@ -843,7 +843,9 @@ function processSwingSpeed(curRawSpeedMs) {
             }
             if (smoothedRawSpeedMs > gyroPeak) {
                 gyroPeak = smoothedRawSpeedMs;
-                playCalSpeedDisplay.innerText = gyroPeak.toFixed(2);
+                if(inputMode === 'gyro') {
+                    playCalSpeedDisplay.innerText = gyroPeak.toFixed(2);
+                }
                 clearTimeout(swingTimer);
                 swingTimer = setTimeout(() => { 
                     if (isSwinging) {
