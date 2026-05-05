@@ -2,70 +2,65 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Putter Speed Tracker</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Putter Tracker - Front Cam</title>
     <style>
         body {
-            font-family: Arial, sans-serif;
-            background-color: #1e1e1e;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #000;
             color: white;
             text-align: center;
             margin: 0;
-            padding: 20px;
+            overflow: hidden; /* Prevents bouncing on mobile */
         }
         #video-container {
             position: relative;
-            display: inline-block;
-            margin-top: 20px;
-            border: 4px solid #333;
-            border-radius: 8px;
-            overflow: hidden;
+            width: 100vw;
+            height: 70vh;
+            background: #111;
         }
-        video, canvas {
-            display: block;
+        video {
+            display: none; /* We draw the video onto the canvas instead */
         }
         canvas {
-            position: absolute;
-            top: 0;
-            left: 0;
-            z-index: 10;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
         }
         .dashboard {
-            margin-top: 20px;
-            padding: 20px;
-            background: #2a2a2a;
-            border-radius: 8px;
-            display: inline-block;
+            height: 30vh;
+            background: #1a1a1a;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            border-top: 2px solid #333;
         }
-        .speed-display {
-            font-size: 3em;
-            font-weight: bold;
+        .speed-val {
+            font-size: 4rem;
+            font-weight: 900;
             color: #00ff88;
+            margin: 0;
         }
-        .instructions {
-            max-width: 600px;
-            margin: 20px auto;
-            color: #aaa;
-            line-height: 1.5;
+        .label {
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            font-size: 0.8rem;
         }
     </style>
 </head>
 <body>
 
-    <h1>Putter Speed Tracker</h1>
-    <div class="instructions">
-        Place a <strong>bright red sticker or tape</strong> on your putter head. <br>
-        Ensure you are in a well-lit room without other bright red objects in the background.
-    </div>
-
     <div id="video-container">
-        <video id="webcam" width="640" height="480" autoplay playsinline muted style="display:none;"></video>
-        <canvas id="outputCanvas" width="640" height="480"></canvas>
+        <video id="webcam" playsinline muted></video>
+        <canvas id="outputCanvas"></canvas>
     </div>
 
     <div class="dashboard">
-        <div>Current Speed (Pixels / Second)</div>
-        <div class="speed-display" id="speedOutput">0</div>
+        <p class="label">Putter Speed</p>
+        <p class="speed-val" id="speedOutput">0</p>
+        <p class="label">Pixels/Sec</p>
     </div>
 
     <script>
@@ -74,96 +69,84 @@
         const ctx = canvas.getContext('2d', { willReadFrequently: true });
         const speedOutput = document.getElementById('speedOutput');
 
-        let lastX = null;
-        let lastY = null;
-        let lastTime = null;
+        let lastX = null, lastY = null, lastTime = null;
 
-        // 1. Request access to the webcam
-        navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } })
-            .then(stream => {
-                video.srcObject = stream;
-                video.play();
-                requestAnimationFrame(processFrame);
-            })
-            .catch(err => {
-                alert("Error accessing webcam: " + err);
-            });
+        // Start Camera - Specifically requesting the FRONT camera
+        navigator.mediaDevices.getUserMedia({ 
+            video: { 
+                facingMode: "user",
+                width: { ideal: 640 },
+                height: { ideal: 480 }
+            } 
+        })
+        .then(stream => {
+            video.srcObject = stream;
+            video.play();
+            requestAnimationFrame(processFrame);
+        })
+        .catch(err => alert("Camera error: " + err));
 
-        // 2. Main processing loop
         function processFrame() {
             if (video.readyState === video.HAVE_ENOUGH_DATA) {
-                // Draw current video frame to canvas
+                // Match canvas size to video size
+                if (canvas.width !== video.videoWidth) {
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                }
+
+                // 1. Draw the actual camera view
                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
                 
-                // Get pixel data from the canvas
                 const frameData = ctx.getImageData(0, 0, canvas.width, canvas.height);
                 const data = frameData.data;
-
                 let totalX = 0, totalY = 0, count = 0;
 
-                // 3. Scan pixels for a specific color (Bright Red)
+                // 2. Track the RED dot
                 for (let i = 0; i < data.length; i += 4) {
-                    const r = data[i];
-                    const g = data[i + 1];
-                    const b = data[i + 2];
-
-                    // Simple threshold for "Red" - High red, low green and blue
-                    if (r > 150 && g < 80 && b < 80) {
+                    const r = data[i], g = data[i+1], b = data[i+2];
+                    // Detection for bright red
+                    if (r > 160 && g < 90 && b < 90) {
                         const pixelIndex = i / 4;
-                        const x = pixelIndex % canvas.width;
-                        const y = Math.floor(pixelIndex / canvas.width);
-                        
-                        totalX += x;
-                        totalY += y;
+                        totalX += pixelIndex % canvas.width;
+                        totalY += Math.floor(pixelIndex / canvas.width);
                         count++;
                     }
                 }
 
-                // 4. If we found a big enough red spot, calculate speed
-                if (count > 50) { // Minimum pixel count to avoid random noise
-                    const currentX = totalX / count; // Center X of the red blob
-                    const currentY = totalY / count; // Center Y of the red blob
-                    const currentTime = performance.now();
+                if (count > 40) {
+                    const curX = totalX / count;
+                    const curY = totalY / count;
+                    const curTime = performance.now();
 
-                    // Draw a green circle over the tracked putter
+                    // 3. DRAW THE HIGHLIGHT (The "Target")
+                    // Outer Ring
                     ctx.beginPath();
-                    ctx.arc(currentX, currentY, 10, 0, 2 * Math.PI);
-                    ctx.fillStyle = "#00ff88";
-                    ctx.fill();
-                    ctx.lineWidth = 2;
-                    ctx.strokeStyle = "white";
+                    ctx.arc(curX, curY, 25, 0, Math.PI * 2);
+                    ctx.strokeStyle = "#00ff88";
+                    ctx.lineWidth = 3;
                     ctx.stroke();
+                    
+                    // Center Dot
+                    ctx.beginPath();
+                    ctx.arc(curX, curY, 5, 0, Math.PI * 2);
+                    ctx.fillStyle = "#fff";
+                    ctx.fill();
 
-                    // Calculate speed if we have a previous frame to compare to
-                    if (lastX !== null && lastY !== null && lastTime !== null) {
-                        const dt = (currentTime - lastTime) / 1000; // Time difference in seconds
-                        
-                        // Distance formula: sqrt((x2 - x1)^2 + (y2 - y1)^2)
-                        const dx = currentX - lastX;
-                        const dy = currentY - lastY;
-                        const distance = Math.sqrt(dx * dx + dy * dy); 
-                        
-                        // Speed = Distance / Time
-                        let speedPxPerSec = distance / dt;
-                        
-                        // Smooth the output slightly so it doesn't jitter too much
-                        speedOutput.innerText = Math.round(speedPxPerSec);
+                    // 4. Calculate Speed
+                    if (lastX !== null && lastTime !== null) {
+                        const dt = (curTime - lastTime) / 1000;
+                        const dist = Math.sqrt((curX - lastX)**2 + (curY - lastY)**2);
+                        const speed = dist / dt;
+                        if (speed < 5000) { // Filter out "teleportation" glitches
+                            speedOutput.innerText = Math.round(speed);
+                        }
                     }
-
-                    // Update last known positions
-                    lastX = currentX;
-                    lastY = currentY;
-                    lastTime = currentTime;
+                    lastX = curX; lastY = curY; lastTime = curTime;
                 } else {
-                    // Lost track of the putter
-                    lastX = null;
-                    lastY = null;
-                    lastTime = null;
                     speedOutput.innerText = "0";
+                    lastX = null;
                 }
             }
-
-            // Loop again for the next frame
             requestAnimationFrame(processFrame);
         }
     </script>
