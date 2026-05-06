@@ -5,9 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
     <title>Green Physics Pro - Unified Practice</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #000; font-family: -apple-system, sans-serif; color: white; }
+        body { margin: 0; overflow: hidden; background: #000; font-family: -apple-system, sans-serif; color: white; width: 100vw; height: 100vh; }
         
-        /* Original UI CSS */
+        /* Master Wrapper to handle 180 rotation */
+        #app-wrapper {
+            position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;
+            overflow: hidden; transition: transform 0.5s ease;
+            transform-origin: center center;
+        }
+        #app-wrapper.upside-down {
+            transform: rotate(180deg);
+        }
+
+        /* Original UI CSS - updated to absolute to stay inside wrapper */
         #uiToggle { position: absolute; top: 10px; left: 10px; z-index: 100; background: #28a745; color: white; border: none; padding: 10px 15px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
         #ui { position: absolute; top: 55px; left: 10px; background: rgba(0,0,0,0.92); padding: 15px; border-radius: 12px; z-index: 10; width: 300px; pointer-events: none; border: 1px solid #444; display: none; max-height: 80vh; overflow-y: auto; }
         #ui.visible { display: block; pointer-events: auto; }
@@ -39,7 +49,7 @@
 
         /* WII GOLF OVERLAY CSS */
         #wiiOverlay, #playOverlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0, 0, 0, 0.95); z-index: 200; display: none;
             flex-direction: column; align-items: center; justify-content: center;
             backdrop-filter: blur(10px);
@@ -68,7 +78,7 @@
         .play-input-group input { width: 80px; padding: 10px; border-radius: 8px; border: 1px solid #555; background: #000; color: #00ffcc; font-size: 18px; font-weight: bold; text-align: center; }
         
         /* CAMERA TRACKING UI */
-        #cameraContainer { display:none; position:fixed; top:10px; right:10px; z-index:250; border: 2px solid #444; border-radius: 8px; overflow:hidden; background:#000; box-shadow: 0 4px 15px rgba(0,0,0,0.8); }
+        #cameraContainer { display:none; position:absolute; top:10px; right:10px; z-index:250; border: 2px solid #444; border-radius: 8px; overflow:hidden; background:#000; box-shadow: 0 4px 15px rgba(0,0,0,0.8); }
         #camCanvas { display: block; width: 160px; height: 120px; }
         .cam-overlay-controls { position:absolute; bottom:5px; width:100%; display:flex; justify-content:space-around; }
         .cam-btn { background:rgba(0,0,0,0.7); color:#fff; border:1px solid #555; padding:4px 8px; border-radius:4px; font-size:10px; cursor:pointer; font-weight: bold; }
@@ -76,245 +86,247 @@
 </head>
 <body>
 
-    <div id="cameraContainer">
-        <video id="camVideo" width="320" height="240" autoplay playsinline style="display:none;"></video>
-        <canvas id="camCanvas" width="320" height="240"></canvas>
-        <div class="cam-overlay-controls">
-            <button id="camViewBtn" class="cam-btn">CAM: FRONT</button>
-        </div>
-    </div>
+    <div id="app-wrapper">
 
-    <div id="wiiOverlay">
-        <button id="closeWiiBtn" class="close-btn">X</button>
-        <div class="wii-title">Practice Swing</div>
-        <div class="wii-target-text">TARGET: <span id="wiiTargetVal">0.00</span> m/s</div>
-        
-        <div class="wii-bar-container">
-            <div id="wiiBarFill"></div>
-            <div id="wiiShortLine" class="wii-zone-line"></div>
-            <div id="wiiTargetLine"></div>
-            <div id="wiiLongLine" class="wii-zone-line"></div>
-        </div>
-        
-        <div class="wii-speed-text"><span id="wiiSpeedVal">0.00</span> <span style="font-size: 1.5rem; color: #aaa;">m/s</span></div>
-        <div id="wiiFeedback">AWAITING SWING</div>
-        <div id="wiiDistanceFeedback"></div>
-    </div>
-
-    <div id="playOverlay">
-        <button id="closePlayBtn" class="close-btn">X</button>
-        
-        <div id="playPhase1" class="play-phase">
-            <div class="wii-title">1. Calibration Putt</div>
-            <div style="font-size:1.2rem; color:#aaa; margin-bottom:20px; text-align:center; line-height:1.5;">Hit a practice putt.<br>Take multiple if needed.</div>
-            <div class="wii-speed-text"><span id="playCalSpeedDisplay">0.00</span> <span style="font-size: 1.5rem; color: #aaa;">m/s</span></div>
-            <div id="playCalFeedback">AWAITING SWING</div>
-            
-            <div id="calSwingList" style="margin-top:15px; width:100%; max-height: 100px; overflow-y:auto; color:#fff; font-family:monospace; text-align:center;"></div>
-            
-            <button id="btnFinishPhase1" class="btn" style="background:#8e44ad; width:100%; padding:15px; margin-top:20px; font-size:1.2rem; border-radius:12px; display:none;">NEXT STEP</button>
+        <div id="cameraContainer">
+            <video id="camVideo" width="320" height="240" autoplay playsinline style="display:none;"></video>
+            <canvas id="camCanvas" width="320" height="240"></canvas>
+            <div class="cam-overlay-controls">
+                <button id="camViewBtn" class="cam-btn">CAM: FRONT</button>
+            </div>
         </div>
 
-        <div id="playPhase2" class="play-phase" style="display:none;">
-            <div class="wii-title">2. Enter Results</div>
+        <div id="wiiOverlay">
+            <button id="closeWiiBtn" class="close-btn">X</button>
+            <div class="wii-title">Practice Swing</div>
+            <div class="wii-target-text">TARGET: <span id="wiiTargetVal">0.00</span> m/s</div>
             
-            <div style="color:#00ffcc; font-size:1.2rem; margin-bottom:10px;">Select Swing Speed to Calibrate:</div>
-            <div id="calSpeedSelector" style="width:100%; background:#111; border:1px solid #444; border-radius:8px; padding:10px; margin-bottom:20px; max-height:140px; overflow-y:auto;">
+            <div class="wii-bar-container">
+                <div id="wiiBarFill"></div>
+                <div id="wiiShortLine" class="wii-zone-line"></div>
+                <div id="wiiTargetLine"></div>
+                <div id="wiiLongLine" class="wii-zone-line"></div>
+            </div>
+            
+            <div class="wii-speed-text"><span id="wiiSpeedVal">0.00</span> <span style="font-size: 1.5rem; color: #aaa;">m/s</span></div>
+            <div id="wiiFeedback">AWAITING SWING</div>
+            <div id="wiiDistanceFeedback"></div>
+        </div>
+
+        <div id="playOverlay">
+            <button id="closePlayBtn" class="close-btn">X</button>
+            
+            <div id="playPhase1" class="play-phase">
+                <div class="wii-title">1. Calibration Putt</div>
+                <div style="font-size:1.2rem; color:#aaa; margin-bottom:20px; text-align:center; line-height:1.5;">Hit a practice putt.<br>Take multiple if needed.</div>
+                <div class="wii-speed-text"><span id="playCalSpeedDisplay">0.00</span> <span style="font-size: 1.5rem; color: #aaa;">m/s</span></div>
+                <div id="playCalFeedback">AWAITING SWING</div>
+                
+                <div id="calSwingList" style="margin-top:15px; width:100%; max-height: 100px; overflow-y:auto; color:#fff; font-family:monospace; text-align:center;"></div>
+                
+                <button id="btnFinishPhase1" class="btn" style="background:#8e44ad; width:100%; padding:15px; margin-top:20px; font-size:1.2rem; border-radius:12px; display:none;">NEXT STEP</button>
+            </div>
+
+            <div id="playPhase2" class="play-phase" style="display:none;">
+                <div class="wii-title">2. Enter Results</div>
+                
+                <div style="color:#00ffcc; font-size:1.2rem; margin-bottom:10px;">Select Swing Speed to Calibrate:</div>
+                <div id="calSpeedSelector" style="width:100%; background:#111; border:1px solid #444; border-radius:8px; padding:10px; margin-bottom:20px; max-height:140px; overflow-y:auto;">
+                    </div>
+                
+                <div class="play-input-group">
+                    <label>Steps Rolled:</label>
+                    <input type="number" id="calSteps" value="10" step="0.5">
                 </div>
-            
-            <div class="play-input-group">
-                <label>Steps Rolled:</label>
-                <input type="number" id="calSteps" value="10" step="0.5">
+                <div class="play-input-group">
+                    <label>Up/Down Slope (deg)<br><span style="font-size:10px; color:#888;">(+ is Uphill, - is Downhill)</span></label>
+                    <input type="number" id="calUpSlope" value="0" step="0.1">
+                </div>
+                <div class="play-input-group">
+                    <label>L/R Slope (deg):</label>
+                    <input type="number" id="calLRSlope" value="0" step="0.1">
+                </div>
+                <button id="btnPlayCalibrate" class="btn" style="background:#00bcd4; width:100%; padding:20px; margin-top:10px; font-size:1.2rem; border-radius:12px;">CALIBRATE SENSOR</button>
             </div>
-            <div class="play-input-group">
-                <label>Up/Down Slope (deg)<br><span style="font-size:10px; color:#888;">(+ is Uphill, - is Downhill)</span></label>
-                <input type="number" id="calUpSlope" value="0" step="0.1">
+
+            <div id="playPhase3" class="play-phase" style="display:none;">
+                <div class="wii-title">Play Mode</div>
+                <div style="display:flex; justify-content:space-between; width:100%; margin-bottom:20px; align-items:center;">
+                    <button id="btnRecalibrate" style="background:#444; border:none; color:white; padding:8px 15px; border-radius:5px; cursor:pointer; font-weight:bold;">RECALIBRATE</button>
+                    <div style="text-align:right;">
+                        <div style="color:#28a745; font-family:monospace; font-weight:bold; font-size:12px;" id="lblPlayStimp">STIMP: 10.0</div>
+                        <div style="color:#ffaa00; font-family:monospace; font-weight:bold; font-size:12px;" id="lblPlayMult">MULT: 1.00x</div>
+                    </div>
+                </div>
+
+                <div class="play-input-group">
+                    <label>Target Steps:</label>
+                    <input type="number" id="playSteps" value="15" step="0.5">
+                </div>
+                <div class="play-input-group">
+                    <label>Up/Down Slope (deg)<br><span style="font-size:10px; color:#888;">(+ is Uphill, - is Downhill)</span></label>
+                    <input type="number" id="playUpSlope" value="0" step="0.1">
+                </div>
+                <div class="play-input-group">
+                    <label>L/R Slope (deg):</label>
+                    <input type="number" id="playLRSlope" value="0" step="0.1">
+                </div>
+                
+                <div style="margin-top:20px; text-align:center; background:#111; border:2px solid #333; padding:20px; border-radius:15px; width:100%; box-sizing:border-box;">
+                    <div style="font-size:1rem; color:#aaa; font-weight:bold; letter-spacing:2px; margin-bottom:10px;">RECOMMENDED SPEED</div>
+                    <div style="font-size:3.5rem; color:#ffeb3b; font-weight:bold; font-family:monospace;"><span id="playRecSpeed">0.00</span> <span style="font-size:1.5rem; color:#888;">m/s</span></div>
+                </div>
+                
+                <button id="btnPracticePlay" class="btn" style="background:#28a745; width:100%; padding:20px; margin-top:20px; font-size:1.2rem; border-radius:12px;">PRACTICE THIS PUTT</button>
             </div>
-            <div class="play-input-group">
-                <label>L/R Slope (deg):</label>
-                <input type="number" id="calLRSlope" value="0" step="0.1">
-            </div>
-            <button id="btnPlayCalibrate" class="btn" style="background:#00bcd4; width:100%; padding:20px; margin-top:10px; font-size:1.2rem; border-radius:12px;">CALIBRATE SENSOR</button>
         </div>
 
-        <div id="playPhase3" class="play-phase" style="display:none;">
-            <div class="wii-title">Play Mode</div>
-            <div style="display:flex; justify-content:space-between; width:100%; margin-bottom:20px; align-items:center;">
-                <button id="btnRecalibrate" style="background:#444; border:none; color:white; padding:8px 15px; border-radius:5px; cursor:pointer; font-weight:bold;">RECALIBRATE</button>
-                <div style="text-align:right;">
-                    <div style="color:#28a745; font-family:monospace; font-weight:bold; font-size:12px;" id="lblPlayStimp">STIMP: 10.0</div>
-                    <div style="color:#ffaa00; font-family:monospace; font-weight:bold; font-size:12px;" id="lblPlayMult">MULT: 1.00x</div>
+        <button id="uiToggle">MENU</button>
+
+        <div id="ui">
+            <h3 style="margin:0 0 10px 0;">Green Physics Pro</h3>
+            
+            <div id="imgConfig" class="img-settings">
+                <div style="color: #ffaa00; font-size: 10px; margin-bottom: 8px; font-weight: bold;">IMAGE SCALE SETTINGS</div>
+                <div class="slider-group">
+                    <label>Front Edge (Yards)</label>
+                    <div class="adj-controls">
+                        <button class="adj-btn" data-param="frontYds" data-val="-1">-1</button>
+                        <button class="adj-btn" data-param="frontYds" data-val="-0.1">-0.1</button>
+                        <span id="frontYdsVal" class="val-display">100.0</span>
+                        <button class="adj-btn" data-param="frontYds" data-val="0.1">+0.1</button>
+                        <button class="adj-btn" data-param="frontYds" data-val="1">+1</button>
+                    </div>
+                </div>
+                <div class="slider-group">
+                    <label>Back Edge (Yards)</label>
+                    <div class="adj-controls">
+                        <button class="adj-btn" data-param="backYds" data-val="-1">-1</button>
+                        <button class="adj-btn" data-param="backYds" data-val="-0.1">-0.1</button>
+                        <span id="backYdsVal" class="val-display">130.0</span>
+                        <button class="adj-btn" data-param="backYds" data-val="0.1">+0.1</button>
+                        <button class="adj-btn" data-param="backYds" data-val="1">+1</button>
+                    </div>
+                </div>
+                <div class="slider-group">
+                    <label>Max Slope (deg)</label>
+                    <div class="adj-controls">
+                        <button class="adj-btn" data-param="slope" data-val="-1">-1</button>
+                        <button class="adj-btn" data-param="slope" data-val="-0.1">-0.1</button>
+                        <span id="slopeVal" class="val-display">3.0°</span>
+                        <button class="adj-btn" data-param="slope" data-val="0.1">+0.1</button>
+                        <button class="adj-btn" data-param="slope" data-val="1">+1</button>
+                    </div>
                 </div>
             </div>
 
-            <div class="play-input-group">
-                <label>Target Steps:</label>
-                <input type="number" id="playSteps" value="15" step="0.5">
-            </div>
-            <div class="play-input-group">
-                <label>Up/Down Slope (deg)<br><span style="font-size:10px; color:#888;">(+ is Uphill, - is Downhill)</span></label>
-                <input type="number" id="playUpSlope" value="0" step="0.1">
-            </div>
-            <div class="play-input-group">
-                <label>L/R Slope (deg):</label>
-                <input type="number" id="playLRSlope" value="0" step="0.1">
-            </div>
-            
-            <div style="margin-top:20px; text-align:center; background:#111; border:2px solid #333; padding:20px; border-radius:15px; width:100%; box-sizing:border-box;">
-                <div style="font-size:1rem; color:#aaa; font-weight:bold; letter-spacing:2px; margin-bottom:10px;">RECOMMENDED SPEED</div>
-                <div style="font-size:3.5rem; color:#ffeb3b; font-weight:bold; font-family:monospace;"><span id="playRecSpeed">0.00</span> <span style="font-size:1.5rem; color:#888;">m/s</span></div>
-            </div>
-            
-            <button id="btnPracticePlay" class="btn" style="background:#28a745; width:100%; padding:20px; margin-top:20px; font-size:1.2rem; border-radius:12px;">PRACTICE THIS PUTT</button>
-        </div>
-    </div>
-
-    <button id="uiToggle">MENU</button>
-
-    <div id="ui">
-        <h3 style="margin:0 0 10px 0;">Green Physics Pro</h3>
-        
-        <div id="imgConfig" class="img-settings">
-            <div style="color: #ffaa00; font-size: 10px; margin-bottom: 8px; font-weight: bold;">IMAGE SCALE SETTINGS</div>
+            <div class="section-title">Environment</div>
             <div class="slider-group">
-                <label>Front Edge (Yards)</label>
+                <label>Mesh Smoothness</label>
                 <div class="adj-controls">
-                    <button class="adj-btn" data-param="frontYds" data-val="-1">-1</button>
-                    <button class="adj-btn" data-param="frontYds" data-val="-0.1">-0.1</button>
-                    <span id="frontYdsVal" class="val-display">100.0</span>
-                    <button class="adj-btn" data-param="frontYds" data-val="0.1">+0.1</button>
-                    <button class="adj-btn" data-param="frontYds" data-val="1">+1</button>
+                    <button class="adj-btn" data-param="smooth" data-val="-1">-1</button>
+                    <button class="adj-btn" data-param="smooth" data-val="-0.1">-0.1</button>
+                    <span id="smoothVal" class="val-display">20</span>
+                    <button class="adj-btn" data-param="smooth" data-val="0.1">+0.1</button>
+                    <button class="adj-btn" data-param="smooth" data-val="1">+1</button>
                 </div>
             </div>
             <div class="slider-group">
-                <label>Back Edge (Yards)</label>
+                <label>Stimp (Speed)</label>
                 <div class="adj-controls">
-                    <button class="adj-btn" data-param="backYds" data-val="-1">-1</button>
-                    <button class="adj-btn" data-param="backYds" data-val="-0.1">-0.1</button>
-                    <span id="backYdsVal" class="val-display">130.0</span>
-                    <button class="adj-btn" data-param="backYds" data-val="0.1">+0.1</button>
-                    <button class="adj-btn" data-param="backYds" data-val="1">+1</button>
+                    <button class="adj-btn" data-param="stimp" data-val="-1">-1</button>
+                    <button class="adj-btn" data-param="stimp" data-val="-0.1">-0.1</button>
+                    <span id="stimpVal" class="val-display">10.0</span>
+                    <button class="adj-btn" data-param="stimp" data-val="0.1">+0.1</button>
+                    <button class="adj-btn" data-param="stimp" data-val="1">+1</button>
+                </div>
+            </div>
+            
+            <div class="section-title">Putt Parameters</div>
+
+            <div class="slider-group">
+                <label>Input Mode</label>
+                <div class="adj-controls">
+                    <button id="btnModeCam" class="adj-btn mode-btn" style="background:#28a745;">CAMERA</button>
+                    <button id="btnModeGyro" class="adj-btn mode-btn" style="background:#333;">GYRO</button>
+                </div>
+            </div>
+            
+            <div class="slider-group">
+                <label>Golfer Handedness</label>
+                <div class="adj-controls">
+                    <button id="btnHandRH" class="adj-btn hand-btn" style="background:#28a745;">RIGHT (RH)</button>
+                    <button id="btnHandLH" class="adj-btn hand-btn" style="background:#333;">LEFT (LH)</button>
+                </div>
+            </div>
+
+            <div class="slider-group" id="camConfigGroup">
+                <label>Camera Track Box Size</label>
+                <div class="adj-controls">
+                    <button class="adj-btn" data-param="camBox" data-val="-10">-10</button>
+                    <button class="adj-btn" data-param="camBox" data-val="-5">-5</button>
+                    <span id="camBoxVal" class="val-display">40</span>
+                    <button class="adj-btn" data-param="camBox" data-val="5">+5</button>
+                    <button class="adj-btn" data-param="camBox" data-val="10">+10</button>
+                </div>
+            </div>
+            
+            <div class="slider-group" id="gyroConfigGroup" style="display:none;">
+                <label>Gyro Axes (Toggle Multiple)</label>
+                <div class="adj-controls">
+                    <button class="adj-btn axis-btn" data-axis="alpha" style="background:#333;">ALPHA</button>
+                    <button class="adj-btn axis-btn" data-axis="beta" style="background:#28a745;">BETA</button>
+                    <button class="adj-btn axis-btn" data-axis="gamma" style="background:#333;">GAMMA</button>
+                </div>
+            </div>
+
+            <div class="slider-group">
+                <label>Sensor Multiplier</label>
+                <div class="adj-controls">
+                    <button class="adj-btn" data-param="speedMult" data-val="-0.1">-0.1</button>
+                    <button class="adj-btn" data-param="speedMult" data-val="-0.01">-0.01</button>
+                    <span id="speedMultVal" class="val-display">1.00x</span>
+                    <button class="adj-btn" data-param="speedMult" data-val="0.01">+0.01</button>
+                    <button class="adj-btn" data-param="speedMult" data-val="0.1">+0.1</button>
                 </div>
             </div>
             <div class="slider-group">
-                <label>Max Slope (deg)</label>
+                <label>Aim Offset</label>
                 <div class="adj-controls">
-                    <button class="adj-btn" data-param="slope" data-val="-1">-1</button>
-                    <button class="adj-btn" data-param="slope" data-val="-0.1">-0.1</button>
-                    <span id="slopeVal" class="val-display">3.0°</span>
-                    <button class="adj-btn" data-param="slope" data-val="0.1">+0.1</button>
-                    <button class="adj-btn" data-param="slope" data-val="1">+1</button>
+                    <button class="adj-btn" data-param="aim" data-val="-1">-1</button>
+                    <button class="adj-btn" data-param="aim" data-val="-0.1">-0.1</button>
+                    <span id="aimVal" class="val-display">0.0°</span>
+                    <button class="adj-btn" data-param="aim" data-val="0.1">+0.1</button>
+                    <button class="adj-btn" data-param="aim" data-val="1">+1</button>
                 </div>
             </div>
+            <div class="slider-group">
+                <label>Optimal Power Target (Sensor Speed)</label>
+                <div class="adj-controls">
+                    <button class="adj-btn" data-param="pwr" data-val="-1">-1</button>
+                    <button class="adj-btn" data-param="pwr" data-val="-0.1">-0.1</button>
+                    <span id="pwrVal" class="val-display">3.2</span>
+                    <button class="adj-btn" data-param="pwr" data-val="0.1">+0.1</button>
+                    <button class="adj-btn" data-param="pwr" data-val="1">+1</button>
+                </div>
+            </div>
+            
+            <div id="results">Upload .PLY or Image to start.</div>
+            <div class="legend"><span style="color:#ff00ff;">➔</span> Pink Arrow: Fall Line<br><span style="color:#ffffff;">---</span> White Dotted: Aim Line</div>
         </div>
 
-        <div class="section-title">Environment</div>
-        <div class="slider-group">
-            <label>Mesh Smoothness</label>
-            <div class="adj-controls">
-                <button class="adj-btn" data-param="smooth" data-val="-1">-1</button>
-                <button class="adj-btn" data-param="smooth" data-val="-0.1">-0.1</button>
-                <span id="smoothVal" class="val-display">20</span>
-                <button class="adj-btn" data-param="smooth" data-val="0.1">+0.1</button>
-                <button class="adj-btn" data-param="smooth" data-val="1">+1</button>
-            </div>
-        </div>
-        <div class="slider-group">
-            <label>Stimp (Speed)</label>
-            <div class="adj-controls">
-                <button class="adj-btn" data-param="stimp" data-val="-1">-1</button>
-                <button class="adj-btn" data-param="stimp" data-val="-0.1">-0.1</button>
-                <span id="stimpVal" class="val-display">10.0</span>
-                <button class="adj-btn" data-param="stimp" data-val="0.1">+0.1</button>
-                <button class="adj-btn" data-param="stimp" data-val="1">+1</button>
-            </div>
-        </div>
-        
-        <div class="section-title">Putt Parameters</div>
-
-        <div class="slider-group">
-            <label>Input Mode</label>
-            <div class="adj-controls">
-                <button id="btnModeCam" class="adj-btn mode-btn" style="background:#28a745;">CAMERA</button>
-                <button id="btnModeGyro" class="adj-btn mode-btn" style="background:#333;">GYRO</button>
-            </div>
-        </div>
-        
-        <div class="slider-group">
-            <label>Golfer Handedness</label>
-            <div class="adj-controls">
-                <button id="btnHandRH" class="adj-btn hand-btn" style="background:#28a745;">RIGHT (RH)</button>
-                <button id="btnHandLH" class="adj-btn hand-btn" style="background:#333;">LEFT (LH)</button>
-            </div>
+        <div id="controls">
+            <label class="btn" style="background:#555;">LOAD PLY<input type="file" id="plyInput" accept=".ply" style="display:none;"></label>
+            <label class="btn" style="background:#007bff;">LOAD IMG<input type="file" id="imgInput" accept="image/*" style="display:none;"></label>
+            <label class="btn" style="background:#8e44ad;">LOAD SAVED<input type="file" id="loadSaveInput" accept=".json" style="display:none;"></label>
+            <button id="playModeBtn" class="btn" style="background:#e91e63;">PLAY MODE</button>
+            <button id="practiceBtn" class="btn" style="background:#00bcd4; display:none;">PRACTICE</button>
+            <button id="optimizeBtn" class="btn" style="background:#28a745; display:none;">OPTIMIZE</button>
+            <button id="resetBtn" class="btn" style="background:#dc3545; display:none;">RESET</button>
+            <button id="saveBtn" class="btn" style="background:#e67e22; display:none;">SAVE</button>
         </div>
 
-        <div class="slider-group" id="camConfigGroup">
-            <label>Camera Track Box Size</label>
-            <div class="adj-controls">
-                <button class="adj-btn" data-param="camBox" data-val="-10">-10</button>
-                <button class="adj-btn" data-param="camBox" data-val="-5">-5</button>
-                <span id="camBoxVal" class="val-display">40</span>
-                <button class="adj-btn" data-param="camBox" data-val="5">+5</button>
-                <button class="adj-btn" data-param="camBox" data-val="10">+10</button>
-            </div>
-        </div>
-        
-        <div class="slider-group" id="gyroConfigGroup" style="display:none;">
-            <label>Gyro Axes (Toggle Multiple)</label>
-            <div class="adj-controls">
-                <button class="adj-btn axis-btn" data-axis="alpha" style="background:#333;">ALPHA</button>
-                <button class="adj-btn axis-btn" data-axis="beta" style="background:#28a745;">BETA</button>
-                <button class="adj-btn axis-btn" data-axis="gamma" style="background:#333;">GAMMA</button>
-            </div>
-        </div>
-
-        <div class="slider-group">
-            <label>Sensor Multiplier</label>
-            <div class="adj-controls">
-                <button class="adj-btn" data-param="speedMult" data-val="-0.1">-0.1</button>
-                <button class="adj-btn" data-param="speedMult" data-val="-0.01">-0.01</button>
-                <span id="speedMultVal" class="val-display">1.00x</span>
-                <button class="adj-btn" data-param="speedMult" data-val="0.01">+0.01</button>
-                <button class="adj-btn" data-param="speedMult" data-val="0.1">+0.1</button>
-            </div>
-        </div>
-        <div class="slider-group">
-            <label>Aim Offset</label>
-            <div class="adj-controls">
-                <button class="adj-btn" data-param="aim" data-val="-1">-1</button>
-                <button class="adj-btn" data-param="aim" data-val="-0.1">-0.1</button>
-                <span id="aimVal" class="val-display">0.0°</span>
-                <button class="adj-btn" data-param="aim" data-val="0.1">+0.1</button>
-                <button class="adj-btn" data-param="aim" data-val="1">+1</button>
-            </div>
-        </div>
-        <div class="slider-group">
-            <label>Optimal Power Target (Sensor Speed)</label>
-            <div class="adj-controls">
-                <button class="adj-btn" data-param="pwr" data-val="-1">-1</button>
-                <button class="adj-btn" data-param="pwr" data-val="-0.1">-0.1</button>
-                <span id="pwrVal" class="val-display">3.2</span>
-                <button class="adj-btn" data-param="pwr" data-val="0.1">+0.1</button>
-                <button class="adj-btn" data-param="pwr" data-val="1">+1</button>
-            </div>
-        </div>
-        
-        <div id="results">Upload .PLY or Image to start.</div>
-        <div class="legend"><span style="color:#ff00ff;">➔</span> Pink Arrow: Fall Line<br><span style="color:#ffffff;">---</span> White Dotted: Aim Line</div>
-    </div>
-
-    <div id="controls">
-        <label class="btn" style="background:#555;">LOAD PLY<input type="file" id="plyInput" accept=".ply" style="display:none;"></label>
-        <label class="btn" style="background:#007bff;">LOAD IMG<input type="file" id="imgInput" accept="image/*" style="display:none;"></label>
-        <label class="btn" style="background:#8e44ad;">LOAD SAVED<input type="file" id="loadSaveInput" accept=".json" style="display:none;"></label>
-        <button id="playModeBtn" class="btn" style="background:#e91e63;">PLAY MODE</button>
-        <button id="practiceBtn" class="btn" style="background:#00bcd4; display:none;">PRACTICE</button>
-        <button id="optimizeBtn" class="btn" style="background:#28a745; display:none;">OPTIMIZE</button>
-        <button id="resetBtn" class="btn" style="background:#dc3545; display:none;">RESET</button>
-        <button id="saveBtn" class="btn" style="background:#e67e22; display:none;">SAVE</button>
-    </div>
-
-    <script type="importmap">
+    </div> <script type="importmap">
         {
             "imports": {
                 "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
@@ -343,7 +355,7 @@
         };
 
         // --- SENSOR VARIABLES ---
-        let inputMode = 'cam'; // 'gyro' or 'cam'
+        let inputMode = 'cam'; 
         let isSensorInit = false;
         let gyroPeak = 0;
         let isSwinging = false;
@@ -353,8 +365,8 @@
         let recentSpeeds = [0, 0, 0];
         let calSwings = []; 
         let activeAxes = { alpha: false, beta: true, gamma: false }; 
-        let activeOverlay = 'none'; // 'none', 'wii', 'play1'
-        let lastFaceAngleInfo = ""; // Store face angle output for UI
+        let activeOverlay = 'none'; 
+        let lastFaceAngleInfo = ""; 
 
         let wiiMaxSpeed = 5.0; 
         let pwrShort = 0;
@@ -369,6 +381,7 @@
         const videoEl = document.getElementById('camVideo');
         const canvasEl = document.getElementById('camCanvas');
         const ctxCam = canvasEl.getContext('2d', { willReadFrequently: true });
+        const appWrapper = document.getElementById('app-wrapper'); // 180 wrapper
 
         const uiPanel = document.getElementById('ui');
         
@@ -438,7 +451,10 @@
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.setPixelRatio(window.devicePixelRatio);
-            document.body.appendChild(renderer.domElement);
+            
+            // Append to the wrapper instead of document body
+            appWrapper.appendChild(renderer.domElement);
+            
             controls = new OrbitControls(camera, renderer.domElement);
             raycaster = new THREE.Raycaster();
             mouse = new THREE.Vector2();
@@ -465,9 +481,9 @@
         async function initCamera() {
             if (camStream) stopCamera();
             
-            // Map the 3 states to constraints
-            let facing = "user"; // front and top default to user camera
-            if (camViewMode === 'back') facing = "environment";
+            // Top and Back views use the back camera (environment)
+            let facing = "user"; 
+            if (camViewMode === 'back' || camViewMode === 'top') facing = "environment";
             
             const constraints = {
                 video: { facingMode: facing, width: { ideal: 320 }, height: { ideal: 240 } }
@@ -499,6 +515,14 @@
             else camViewMode = 'front';
             
             document.getElementById('camViewBtn').innerText = `CAM: ${camViewMode.toUpperCase()}`;
+            
+            // 180 DEGREE ROTATION TOGGLE
+            if (camViewMode === 'top') {
+                appWrapper.classList.add('upside-down');
+            } else {
+                appWrapper.classList.remove('upside-down');
+            }
+
             if (inputMode === 'cam') initCamera();
         };
 
@@ -592,10 +616,8 @@
                                     let faceStr = "SQUARE";
                                     if (Math.abs(angle) > 3.0) {
                                         if (sysParams.handedness === 'RH') {
-                                            // Top blob further right (dx > 0) in RH swing (moving R to L) means it lags = PUSH
                                             faceStr = angle > 0 ? "PUSH" : "PULL";
                                         } else {
-                                            // Top blob further right (dx > 0) in LH swing (moving L to R) means it leads = PULL
                                             faceStr = angle > 0 ? "PULL" : "PUSH";
                                         }
                                     }
@@ -1520,7 +1542,19 @@
 
         function onPick(e) {
             if (selectedPoints.length >= 2) return;
-            mouse.x = (e.clientX / window.innerWidth) * 2 - 1; mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+            
+            // Adjust coordinates based on whether the app is currently upside down
+            let cx = e.clientX;
+            let cy = e.clientY;
+            
+            if (camViewMode === 'top') {
+                cx = window.innerWidth - cx;
+                cy = window.innerHeight - cy;
+            }
+
+            mouse.x = (cx / window.innerWidth) * 2 - 1;
+            mouse.y = -(cy / window.innerHeight) * 2 + 1;
+            
             raycaster.setFromCamera(mouse, camera);
             const hits = raycaster.intersectObject(meshSurface);
             if (hits.length > 0) {
