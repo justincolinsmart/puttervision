@@ -466,8 +466,10 @@
             if (camStream) stopCamera();
             
             // Map the 3 states to constraints
-            let facing = "user"; // front and top default to user camera
-            if (camViewMode === 'back') facing = "environment";
+            let facing = "user"; // front defaults to user camera
+            if (camViewMode === 'back' || camViewMode === 'top') {
+                facing = "environment";
+            }
             
             const constraints = {
                 video: { facingMode: facing, width: { ideal: 320 }, height: { ideal: 240 } }
