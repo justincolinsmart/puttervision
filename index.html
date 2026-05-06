@@ -59,7 +59,8 @@
         .wii-speed-text { font-size: 3rem; color: #fff; margin-top: 40px; font-weight: bold; font-family: monospace; }
         #wiiFeedback, #playCalFeedback { font-size: 2.5rem; margin-top: 20px; font-weight: bold; color: transparent; text-transform: uppercase; letter-spacing: 2px; text-shadow: none; transition: 0.3s; }
         #wiiDistanceFeedback { font-size: 1.5rem; margin-top: 10px; font-weight: normal; color: #ccc; letter-spacing: 1px; min-height: 28px; }
-        .close-btn { position: absolute; top: 30px; right: 30px; background: #dc3545; color: #fff; border: none; font-size: 1.5rem; font-weight: bold; width: 60px; height: 60px; border-radius: 30px; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.5); z-index: 300; }
+        /* Moved to LEFT to avoid camera overlap */
+        .close-btn { position: absolute; top: 30px; left: 30px; background: #dc3545; color: #fff; border: none; font-size: 1.5rem; font-weight: bold; width: 60px; height: 60px; border-radius: 30px; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.5); z-index: 300; }
 
         /* PLAY MODE CSS */
         .play-phase { display: flex; flex-direction: column; align-items: center; width: 90%; max-width: 400px; }
@@ -67,7 +68,7 @@
         .play-input-group label { font-size: 14px; color: #fff; text-transform: none; font-weight: bold; margin: 0; }
         .play-input-group input { width: 80px; padding: 10px; border-radius: 8px; border: 1px solid #555; background: #000; color: #00ffcc; font-size: 18px; font-weight: bold; text-align: center; }
         
-        /* CAMERA TRACKING UI - Increased z-index to 250 so it floats over the dark overlays */
+        /* CAMERA TRACKING UI */
         #cameraContainer { display:none; position:fixed; top:10px; right:10px; z-index:250; border: 2px solid #444; border-radius: 8px; overflow:hidden; background:#000; box-shadow: 0 4px 15px rgba(0,0,0,0.8); }
         #camCanvas { display: block; width: 160px; height: 120px; }
         .cam-overlay-controls { position:absolute; bottom:5px; width:100%; display:flex; justify-content:space-around; }
@@ -468,6 +469,9 @@
             let frame = ctxCam.getImageData(0, 0, canvasEl.width, canvasEl.height);
             let data = frame.data;
             let sumX = 0, sumY = 0, count = 0;
+            
+            // Defines how far the club can travel per frame before it breaks tracking (80px radius = 160x160 window)
+            let searchRadius = 80; 
 
             // Thresholding and manipulation loop
             for (let i = 0; i < data.length; i += 4) {
@@ -476,11 +480,23 @@
                 // High Red, low Green, low Blue
                 if (r > 100 && r > g * 1.5 && r > b * 1.5) {
                     let pixelIndex = i / 4;
-                    sumX += pixelIndex % canvasEl.width;
-                    sumY += Math.floor(pixelIndex / canvasEl.width);
+                    let px = pixelIndex % canvasEl.width;
+                    let py = Math.floor(pixelIndex / canvasEl.width);
+
+                    // Spatial Filtering: If we have a track, ignore red outside the window
+                    if (lastBlobPos) {
+                        if (Math.abs(px - lastBlobPos.x) > searchRadius || Math.abs(py - lastBlobPos.y) > searchRadius) {
+                            // Turn ignored red pixels DARK RED so the user knows they are excluded
+                            data[i] = 100; data[i+1] = 0; data[i+2] = 0;
+                            continue;
+                        }
+                    }
+
+                    sumX += px;
+                    sumY += py;
                     count++;
                     
-                    // Turn "red" target pixels pure white
+                    // Turn "tracked" red target pixels pure white
                     data[i] = 255; data[i+1] = 255; data[i+2] = 255;
                 } else {
                     // Turn everything else pure black
@@ -492,6 +508,8 @@
             ctxCam.putImageData(frame, 0, 0);
 
             let now = performance.now();
+            
+            // Must have a minimum amount of valid pixels to count as the putter
             if (count > 5) { 
                 let cx = sumX / count;
                 let cy = sumY / count;
@@ -500,12 +518,17 @@
                 ctxCam.fillStyle = '#00ff00';
                 ctxCam.beginPath(); ctxCam.arc(cx, cy, 5, 0, 2*Math.PI); ctxCam.fill();
 
+                // Draw bounding box to show the active tracking area
+                ctxCam.strokeStyle = 'rgba(0, 255, 0, 0.5)';
+                ctxCam.lineWidth = 2;
+                ctxCam.strokeRect(cx - searchRadius, cy - searchRadius, searchRadius * 2, searchRadius * 2);
+
                 if (lastBlobPos && lastFrameTime > 0) {
                     let dt = (now - lastFrameTime) / 1000; 
                     if (dt > 0) {
                         let dx = cx - lastBlobPos.x;
                         
-                        // ONLY tracking horizontal pixel displacement per your request
+                        // ONLY tracking horizontal pixel displacement
                         let distPixels = Math.abs(dx); 
                         
                         if (distPixels > 2) { 
@@ -519,6 +542,7 @@
                 }
                 lastBlobPos = {x: cx, y: cy};
             } else {
+                // We lost the target. Clear last position so we scan the whole frame next time to re-acquire.
                 lastBlobPos = null;
                 processSensorSpeed(0);
             }
