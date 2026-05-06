@@ -239,6 +239,14 @@
                 <button id="btnModeGyro" class="adj-btn mode-btn" style="background:#333;">GYRO</button>
             </div>
         </div>
+        
+        <div class="slider-group">
+            <label>Golfer Handedness</label>
+            <div class="adj-controls">
+                <button id="btnHandRH" class="adj-btn hand-btn" style="background:#28a745;">RIGHT (RH)</button>
+                <button id="btnHandLH" class="adj-btn hand-btn" style="background:#333;">LEFT (LH)</button>
+            </div>
+        </div>
 
         <div class="slider-group" id="camConfigGroup">
             <label>Camera Track Box Size</label>
@@ -331,7 +339,7 @@
         
         let sysParams = {
             frontYds: 100.0, backYds: 130.0, slope: 3.0,
-            smooth: 20, stimp: 10.0, aim: 0.0, pwr: 3.2, speedMult: 1.0, camBox: 40
+            smooth: 20, stimp: 10.0, aim: 0.0, pwr: 3.2, speedMult: 1.0, camBox: 40, handedness: 'RH'
         };
 
         // --- SENSOR VARIABLES ---
@@ -411,6 +419,16 @@
             } else {
                 initCamera();
             }
+        }
+        
+        // Toggle Handedness
+        document.getElementById('btnHandRH').onclick = () => setHandedness('RH');
+        document.getElementById('btnHandLH').onclick = () => setHandedness('LH');
+        
+        function setHandedness(hand) {
+            sysParams.handedness = hand;
+            document.getElementById('btnHandRH').style.background = hand === 'RH' ? '#28a745' : '#333';
+            document.getElementById('btnHandLH').style.background = hand === 'LH' ? '#28a745' : '#333';
         }
 
         init();
@@ -556,8 +574,15 @@
                 if (lastBlobPos && lastFrameTime > 0) {
                     let dt = (now - lastFrameTime) / 1000; 
                     if (dt > 0) {
-                        // CROSSING LOGIC: Check if it crossed the middle line this exact frame
-                        let crossed = (lastBlobPos.x > midX && cx <= midX) || (lastBlobPos.x < midX && cx >= midX);
+                        // CROSSING LOGIC based on handedness
+                        let crossed = false;
+                        if (sysParams.handedness === 'RH') {
+                            // Right-handed: forward stroke moves Right to Left across screen (x decreases)
+                            crossed = (lastBlobPos.x > midX && cx <= midX);
+                        } else {
+                            // Left-handed: forward stroke moves Left to Right across screen (x increases)
+                            crossed = (lastBlobPos.x < midX && cx >= midX);
+                        }
                         
                         if (crossed) {
                             let distPixels = Math.abs(cx - lastBlobPos.x); 
@@ -1098,7 +1123,7 @@
 
         document.querySelectorAll('.adj-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
-                if(e.target.classList.contains('axis-btn') || e.target.classList.contains('mode-btn')) return; 
+                if(e.target.classList.contains('axis-btn') || e.target.classList.contains('mode-btn') || e.target.classList.contains('hand-btn')) return; 
                 const param = e.target.getAttribute('data-param');
                 const change = parseFloat(e.target.getAttribute('data-val'));
                 updateParam(param, change);
