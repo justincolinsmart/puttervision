@@ -59,7 +59,7 @@
         .wii-speed-text { font-size: 3rem; color: #fff; margin-top: 40px; font-weight: bold; font-family: monospace; }
         #wiiFeedback, #playCalFeedback { font-size: 2.5rem; margin-top: 20px; font-weight: bold; color: transparent; text-transform: uppercase; letter-spacing: 2px; text-shadow: none; transition: 0.3s; }
         #wiiDistanceFeedback { font-size: 1.5rem; margin-top: 10px; font-weight: normal; color: #ccc; letter-spacing: 1px; min-height: 28px; }
-        .close-btn { position: absolute; top: 30px; right: 30px; background: #dc3545; color: #fff; border: none; font-size: 1.5rem; font-weight: bold; width: 60px; height: 60px; border-radius: 30px; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
+        .close-btn { position: absolute; top: 30px; right: 30px; background: #dc3545; color: #fff; border: none; font-size: 1.5rem; font-weight: bold; width: 60px; height: 60px; border-radius: 30px; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.5); z-index: 300; }
 
         /* PLAY MODE CSS */
         .play-phase { display: flex; flex-direction: column; align-items: center; width: 90%; max-width: 400px; }
@@ -67,8 +67,8 @@
         .play-input-group label { font-size: 14px; color: #fff; text-transform: none; font-weight: bold; margin: 0; }
         .play-input-group input { width: 80px; padding: 10px; border-radius: 8px; border: 1px solid #555; background: #000; color: #00ffcc; font-size: 18px; font-weight: bold; text-align: center; }
         
-        /* CAMERA TRACKING UI */
-        #cameraContainer { display:none; position:fixed; top:10px; right:10px; z-index:150; border: 2px solid #444; border-radius: 8px; overflow:hidden; background:#000; box-shadow: 0 4px 15px rgba(0,0,0,0.8); }
+        /* CAMERA TRACKING UI - Increased z-index to 250 so it floats over the dark overlays */
+        #cameraContainer { display:none; position:fixed; top:10px; right:10px; z-index:250; border: 2px solid #444; border-radius: 8px; overflow:hidden; background:#000; box-shadow: 0 4px 15px rgba(0,0,0,0.8); }
         #camCanvas { display: block; width: 160px; height: 120px; }
         .cam-overlay-controls { position:absolute; bottom:5px; width:100%; display:flex; justify-content:space-around; }
         .cam-btn { background:rgba(0,0,0,0.7); color:#fff; border:1px solid #555; padding:4px 8px; border-radius:4px; font-size:10px; cursor:pointer; }
@@ -469,25 +469,34 @@
             let data = frame.data;
             let sumX = 0, sumY = 0, count = 0;
 
-            // Simple Color Thresholding for RED
-            for (let y = 0; y < canvasEl.height; y += 2) { 
-                for (let x = 0; x < canvasEl.width; x += 2) {
-                    let i = (y * canvasEl.width + x) * 4;
-                    let r = data[i], g = data[i+1], b = data[i+2];
+            // Thresholding and manipulation loop
+            for (let i = 0; i < data.length; i += 4) {
+                let r = data[i], g = data[i+1], b = data[i+2];
+                
+                // High Red, low Green, low Blue
+                if (r > 100 && r > g * 1.5 && r > b * 1.5) {
+                    let pixelIndex = i / 4;
+                    sumX += pixelIndex % canvasEl.width;
+                    sumY += Math.floor(pixelIndex / canvasEl.width);
+                    count++;
                     
-                    // High Red, low Green, low Blue
-                    if (r > 100 && r > g * 1.5 && r > b * 1.5) {
-                        sumX += x; sumY += y; count++;
-                    }
+                    // Turn "red" target pixels pure white
+                    data[i] = 255; data[i+1] = 255; data[i+2] = 255;
+                } else {
+                    // Turn everything else pure black
+                    data[i] = 0; data[i+1] = 0; data[i+2] = 0;
                 }
             }
+            
+            // Draw the binary threshold image back to the canvas so the user sees it
+            ctxCam.putImageData(frame, 0, 0);
 
             let now = performance.now();
             if (count > 5) { 
                 let cx = sumX / count;
                 let cy = sumY / count;
                 
-                // Draw tracking indicator
+                // Draw tracking indicator (green dot on the white shape)
                 ctxCam.fillStyle = '#00ff00';
                 ctxCam.beginPath(); ctxCam.arc(cx, cy, 5, 0, 2*Math.PI); ctxCam.fill();
 
@@ -495,13 +504,12 @@
                     let dt = (now - lastFrameTime) / 1000; 
                     if (dt > 0) {
                         let dx = cx - lastBlobPos.x;
-                        let dy = cy - lastBlobPos.y;
-                        let distPixels = Math.sqrt(dx*dx + dy*dy);
+                        
+                        // ONLY tracking horizontal pixel displacement per your request
+                        let distPixels = Math.abs(dx); 
                         
                         if (distPixels > 2) { 
                             let speedPixels = distPixels / dt;
-                            // Scale down pixel displacement speed to align roughly with the raw gyro scale (0 to ~6.0)
-                            // The calibration math will perfectly handle the remaining variance.
                             let rawCamSpeed = speedPixels * 0.003; 
                             processSensorSpeed(rawCamSpeed);
                         } else {
