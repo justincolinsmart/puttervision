@@ -466,10 +466,8 @@
             if (camStream) stopCamera();
             
             // Map the 3 states to constraints
-            let facing = "user"; // front defaults to user camera
-            if (camViewMode === 'back' || camViewMode === 'top') {
-                facing = "environment";
-            }
+            let facing = "user"; // front and top default to user camera
+            if (camViewMode === 'back') facing = "environment";
             
             const constraints = {
                 video: { facingMode: facing, width: { ideal: 320 }, height: { ideal: 240 } }
@@ -542,10 +540,10 @@
             let now = performance.now();
 
             if (camViewMode === 'top') {
-                // TOP VIEW LOGIC: Horizontal Line, 2 Blobs, Face Angle
-                let midY = canvasEl.height / 2;
+                // TOP VIEW LOGIC: Vertical Line, 2 Blobs, Face Angle
+                let midX = canvasEl.width / 2;
                 ctxCam.strokeStyle = 'rgba(255, 255, 0, 0.4)';
-                ctxCam.beginPath(); ctxCam.moveTo(0, midY); ctxCam.lineTo(canvasEl.width, midY); ctxCam.stroke();
+                ctxCam.beginPath(); ctxCam.moveTo(midX, 0); ctxCam.lineTo(midX, canvasEl.height); ctxCam.stroke();
 
                 if (redPixels.length > 5) {
                     // Fast K-Means (K=2) for Heel/Toe blobs
@@ -573,17 +571,34 @@
                     if (lastBlobPos && lastFrameTime > 0) {
                         let dt = (now - lastFrameTime) / 1000;
                         if (dt > 0) {
-                            // Crossing Horizontal Line (any direction)
-                            let crossed = (lastBlobPos.y > midY && cy <= midY) || (lastBlobPos.y < midY && cy >= midY);
+                            // Crossing Vertical Line
+                            let crossed = false;
+                            if (sysParams.handedness === 'RH') crossed = (lastBlobPos.x > midX && cx <= midX);
+                            else crossed = (lastBlobPos.x < midX && cx >= midX);
+
                             if (crossed) {
-                                let distPixels = Math.abs(cy - lastBlobPos.y); 
+                                let distPixels = Math.abs(cx - lastBlobPos.x); 
                                 let speedPixels = distPixels / dt;
                                 let rawCamSpeed = speedPixels * 0.003; 
                                 
                                 if (rawCamSpeed > 0.1) {
-                                    let dx = c2.x - c1.x; let dy = c2.y - c1.y;
-                                    let angle = dx !== 0 ? Math.atan(dy / dx) * (180 / Math.PI) : 0;
-                                    let faceStr = Math.abs(angle) < 3.0 ? "SQUARE" : (angle > 0 ? "PUSH" : "PULL");
+                                    // Ensure c1 is top blob (smaller y), c2 is bottom blob (larger y)
+                                    if (c1.y > c2.y) { let temp = c1; c1 = c2; c2 = temp; }
+                                    
+                                    let dx = c1.x - c2.x; 
+                                    let dy = c2.y - c1.y; 
+                                    let angle = dy !== 0 ? Math.atan(dx / dy) * (180 / Math.PI) : 0;
+                                    
+                                    let faceStr = "SQUARE";
+                                    if (Math.abs(angle) > 3.0) {
+                                        if (sysParams.handedness === 'RH') {
+                                            // Top blob further right (dx > 0) in RH swing (moving R to L) means it lags = PUSH
+                                            faceStr = angle > 0 ? "PUSH" : "PULL";
+                                        } else {
+                                            // Top blob further right (dx > 0) in LH swing (moving L to R) means it leads = PULL
+                                            faceStr = angle > 0 ? "PULL" : "PUSH";
+                                        }
+                                    }
                                     lastFaceAngleInfo = `Face: ${Math.abs(angle).toFixed(1)}° (${faceStr})`;
                                     triggerDiscreteSwing(rawCamSpeed, lastFaceAngleInfo);
                                 }
@@ -623,7 +638,7 @@
                                 let speedPixels = distPixels / dt;
                                 let rawCamSpeed = speedPixels * 0.003; 
                                 if (rawCamSpeed > 0.1) {
-                                    lastFaceAngleInfo = ""; // Not available in side view
+                                    lastFaceAngleInfo = ""; // Not available in 1-blob views
                                     triggerDiscreteSwing(rawCamSpeed, lastFaceAngleInfo);
                                 }
                             }
