@@ -433,6 +433,10 @@
             light.position.set(5, 20, 10);
             scene.add(light);
             
+            ghostBall = new THREE.Mesh(new THREE.SphereGeometry(0.021, 16, 16), new THREE.MeshBasicMaterial({color: 0xffffff}));
+            ghostBall.visible = false;
+            scene.add(ghostBall);
+            
             window.addEventListener('pointerdown', (e) => {
                 if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON' || uiPanel.contains(e.target) || wiiOverlay.contains(e.target) || playOverlay.contains(e.target) || document.getElementById('cameraContainer').contains(e.target) || !meshSurface) return;
                 onPick(e);
