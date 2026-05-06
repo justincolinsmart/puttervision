@@ -58,7 +58,7 @@
         #wiiLongLine { background: #ff4444; box-shadow: 0 0 10px rgba(255,68,68,0.6); }
         .wii-speed-text { font-size: 3rem; color: #fff; margin-top: 40px; font-weight: bold; font-family: monospace; }
         #wiiFeedback, #playCalFeedback { font-size: 2.5rem; margin-top: 20px; font-weight: bold; color: transparent; text-transform: uppercase; letter-spacing: 2px; text-shadow: none; transition: 0.3s; }
-        #wiiDistanceFeedback { font-size: 1.5rem; margin-top: 10px; font-weight: normal; color: #ccc; letter-spacing: 1px; min-height: 28px; }
+        #wiiDistanceFeedback { font-size: 1.5rem; margin-top: 10px; font-weight: normal; color: #ccc; letter-spacing: 1px; min-height: 56px; text-align: center;}
         .close-btn { position: absolute; top: 30px; left: 30px; background: #dc3545; color: #fff; border: none; font-size: 1.5rem; font-weight: bold; width: 60px; height: 60px; border-radius: 30px; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.5); z-index: 300; }
 
         /* PLAY MODE CSS */
@@ -71,7 +71,7 @@
         #cameraContainer { display:none; position:fixed; top:10px; right:10px; z-index:250; border: 2px solid #444; border-radius: 8px; overflow:hidden; background:#000; box-shadow: 0 4px 15px rgba(0,0,0,0.8); }
         #camCanvas { display: block; width: 160px; height: 120px; }
         .cam-overlay-controls { position:absolute; bottom:5px; width:100%; display:flex; justify-content:space-around; }
-        .cam-btn { background:rgba(0,0,0,0.7); color:#fff; border:1px solid #555; padding:4px 8px; border-radius:4px; font-size:10px; cursor:pointer; }
+        .cam-btn { background:rgba(0,0,0,0.7); color:#fff; border:1px solid #555; padding:4px 8px; border-radius:4px; font-size:10px; cursor:pointer; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -80,7 +80,7 @@
         <video id="camVideo" width="320" height="240" autoplay playsinline style="display:none;"></video>
         <canvas id="camCanvas" width="320" height="240"></canvas>
         <div class="cam-overlay-controls">
-            <button id="camFlipBtn" class="cam-btn">FLIP CAM</button>
+            <button id="camViewBtn" class="cam-btn">CAM: FRONT</button>
         </div>
     </div>
 
@@ -134,13 +134,13 @@
                 <label>L/R Slope (deg):</label>
                 <input type="number" id="calLRSlope" value="0" step="0.1">
             </div>
-            <button id="btnPlayCalibrate" class="btn" style="background:#00bcd4; width:100%; padding:20px; margin-top:10px; font-size:1.2rem; border-radius:12px;">CALIBRATE PUTTER SENSOR</button>
+            <button id="btnPlayCalibrate" class="btn" style="background:#00bcd4; width:100%; padding:20px; margin-top:10px; font-size:1.2rem; border-radius:12px;">CALIBRATE SENSOR</button>
         </div>
 
         <div id="playPhase3" class="play-phase" style="display:none;">
             <div class="wii-title">Play Mode</div>
             <div style="display:flex; justify-content:space-between; width:100%; margin-bottom:20px; align-items:center;">
-                <button id="btnRecalibrate" style="background:#444; border:none; color:white; padding:8px 15px; border-radius:5px; cursor:pointer; font-weight:bold;">RECALIBRATE SENSOR</button>
+                <button id="btnRecalibrate" style="background:#444; border:none; color:white; padding:8px 15px; border-radius:5px; cursor:pointer; font-weight:bold;">RECALIBRATE</button>
                 <div style="text-align:right;">
                     <div style="color:#28a745; font-family:monospace; font-weight:bold; font-size:12px;" id="lblPlayStimp">STIMP: 10.0</div>
                     <div style="color:#ffaa00; font-family:monospace; font-weight:bold; font-size:12px;" id="lblPlayMult">MULT: 1.00x</div>
@@ -161,7 +161,7 @@
             </div>
             
             <div style="margin-top:20px; text-align:center; background:#111; border:2px solid #333; padding:20px; border-radius:15px; width:100%; box-sizing:border-box;">
-                <div style="font-size:1rem; color:#aaa; font-weight:bold; letter-spacing:2px; margin-bottom:10px;">RECOMMENDED SENSOR SPEED</div>
+                <div style="font-size:1rem; color:#aaa; font-weight:bold; letter-spacing:2px; margin-bottom:10px;">RECOMMENDED SPEED</div>
                 <div style="font-size:3.5rem; color:#ffeb3b; font-weight:bold; font-family:monospace;"><span id="playRecSpeed">0.00</span> <span style="font-size:1.5rem; color:#888;">m/s</span></div>
             </div>
             
@@ -343,7 +343,7 @@
         };
 
         // --- SENSOR VARIABLES ---
-        let inputMode = 'cam'; // 'gyro' or 'cam' defaults to cam now
+        let inputMode = 'cam'; // 'gyro' or 'cam'
         let isSensorInit = false;
         let gyroPeak = 0;
         let isSwinging = false;
@@ -351,19 +351,18 @@
         let resetUITimer = null; 
         const RADIUS_TO_PIVOT_METERS = 1.3;
         let recentSpeeds = [0, 0, 0];
-        let calSwings = []; // To hold multiple calibration swings
-        
+        let calSwings = []; 
         let activeAxes = { alpha: false, beta: true, gamma: false }; 
         let activeOverlay = 'none'; // 'none', 'wii', 'play1'
-        
-        // Target Window speeds (Wii Mode)
+        let lastFaceAngleInfo = ""; // Store face angle output for UI
+
         let wiiMaxSpeed = 5.0; 
         let pwrShort = 0;
         let pwrLong = 0;
 
         // --- CAMERA TRACKING VARIABLES ---
         let camStream = null;
-        let useFrontCam = false;
+        let camViewMode = 'front'; // 'front', 'back', 'top'
         let lastBlobPos = null;
         let lastFrameTime = 0;
         let camTrackingInterval = null;
@@ -404,7 +403,6 @@
             });
         });
 
-        // Toggle Sensor Mode
         document.getElementById('btnModeGyro').onclick = () => setInputMode('gyro');
         document.getElementById('btnModeCam').onclick = () => setInputMode('cam');
         
@@ -421,7 +419,6 @@
             }
         }
         
-        // Toggle Handedness
         document.getElementById('btnHandRH').onclick = () => setHandedness('RH');
         document.getElementById('btnHandLH').onclick = () => setHandedness('LH');
         
@@ -460,15 +457,20 @@
                 onPick(e);
             });
             
-            setInputMode('cam'); // Launch directly into cam mode
+            setInputMode('cam'); 
             animate();
         }
 
         // --- CAMERA MACHINE VISION LOGIC ---
         async function initCamera() {
             if (camStream) stopCamera();
+            
+            // Map the 3 states to constraints
+            let facing = "user"; // front and top default to user camera
+            if (camViewMode === 'back') facing = "environment";
+            
             const constraints = {
-                video: { facingMode: useFrontCam ? "user" : "environment", width: { ideal: 320 }, height: { ideal: 240 } }
+                video: { facingMode: facing, width: { ideal: 320 }, height: { ideal: 240 } }
             };
             try {
                 camStream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -478,7 +480,7 @@
                 lastBlobPos = null;
                 trackCamera();
             } catch (err) {
-                alert("Camera initialization error. Ensure you are on HTTPS and granted permissions. Details: " + err);
+                alert("Camera initialization error. Details: " + err);
                 setInputMode('gyro'); 
             }
         }
@@ -490,8 +492,13 @@
             cancelAnimationFrame(camTrackingInterval);
         }
 
-        document.getElementById('camFlipBtn').onclick = () => {
-            useFrontCam = !useFrontCam;
+        // Cycle through FRONT -> BACK -> TOP
+        document.getElementById('camViewBtn').onclick = () => {
+            if (camViewMode === 'front') camViewMode = 'back';
+            else if (camViewMode === 'back') camViewMode = 'top';
+            else camViewMode = 'front';
+            
+            document.getElementById('camViewBtn').innerText = `CAM: ${camViewMode.toUpperCase()}`;
             if (inputMode === 'cam') initCamera();
         };
 
@@ -505,99 +512,125 @@
             ctxCam.drawImage(videoEl, 0, 0, canvasEl.width, canvasEl.height);
             let frame = ctxCam.getImageData(0, 0, canvasEl.width, canvasEl.height);
             let data = frame.data;
-            let sumX = 0, sumY = 0, count = 0;
             
             let searchRadius = sysParams.camBox; 
+            let redPixels = [];
 
-            // Thresholding and manipulation loop
+            // Find all valid red pixels across the ENTIRE image
             for (let i = 0; i < data.length; i += 4) {
-                let pixelIndex = i / 4;
-                let px = pixelIndex % canvasEl.width;
-                let py = Math.floor(pixelIndex / canvasEl.width);
-
-                // BOTTOM HALF ONLY: Black out top half to avoid hats/shirts
-                if (py < canvasEl.height / 2) {
-                    data[i] = 0; data[i+1] = 0; data[i+2] = 0;
-                    continue;
-                }
-
+                let px = (i / 4) % canvasEl.width;
+                let py = Math.floor((i / 4) / canvasEl.width);
                 let r = data[i], g = data[i+1], b = data[i+2];
                 
-                // High Red, low Green, low Blue
                 if (r > 100 && r > g * 1.5 && r > b * 1.5) {
-                    // Spatial Filtering: If we have a track, ignore red outside the window
                     if (lastBlobPos) {
                         if (Math.abs(px - lastBlobPos.x) > searchRadius || Math.abs(py - lastBlobPos.y) > searchRadius) {
-                            // Turn ignored red pixels DARK RED so user knows they are excluded
                             data[i] = 100; data[i+1] = 0; data[i+2] = 0;
                             continue;
                         }
                     }
-
-                    sumX += px;
-                    sumY += py;
-                    count++;
-                    
-                    // Turn "tracked" red target pixels pure white
+                    redPixels.push({x: px, y: py});
                     data[i] = 255; data[i+1] = 255; data[i+2] = 255;
                 } else {
-                    // Turn everything else pure black
                     data[i] = 0; data[i+1] = 0; data[i+2] = 0;
                 }
             }
             
             ctxCam.putImageData(frame, 0, 0);
-
-            // Draw center crossing line (yellow)
-            let midX = canvasEl.width / 2;
-            ctxCam.strokeStyle = 'rgba(255, 255, 0, 0.4)';
-            ctxCam.beginPath();
-            ctxCam.moveTo(midX, canvasEl.height / 2);
-            ctxCam.lineTo(midX, canvasEl.height);
-            ctxCam.stroke();
-
             let now = performance.now();
-            
-            if (count > 5) { 
-                let cx = sumX / count;
-                let cy = sumY / count;
-                
-                // Draw tracking indicator (green dot on the white shape)
-                ctxCam.fillStyle = '#00ff00';
-                ctxCam.beginPath(); ctxCam.arc(cx, cy, 5, 0, 2*Math.PI); ctxCam.fill();
 
-                // Draw bounding box to show the active tracking area
-                ctxCam.strokeStyle = 'rgba(0, 255, 0, 0.5)';
-                ctxCam.lineWidth = 2;
-                ctxCam.strokeRect(cx - searchRadius, cy - searchRadius, searchRadius * 2, searchRadius * 2);
+            if (camViewMode === 'top') {
+                // TOP VIEW LOGIC: Horizontal Line, 2 Blobs, Face Angle
+                let midY = canvasEl.height / 2;
+                ctxCam.strokeStyle = 'rgba(255, 255, 0, 0.4)';
+                ctxCam.beginPath(); ctxCam.moveTo(0, midY); ctxCam.lineTo(canvasEl.width, midY); ctxCam.stroke();
 
-                if (lastBlobPos && lastFrameTime > 0) {
-                    let dt = (now - lastFrameTime) / 1000; 
-                    if (dt > 0) {
-                        // CROSSING LOGIC based on handedness
-                        let crossed = false;
-                        if (sysParams.handedness === 'RH') {
-                            // Right-handed: forward stroke moves Right to Left across screen (x decreases)
-                            crossed = (lastBlobPos.x > midX && cx <= midX);
-                        } else {
-                            // Left-handed: forward stroke moves Left to Right across screen (x increases)
-                            crossed = (lastBlobPos.x < midX && cx >= midX);
+                if (redPixels.length > 5) {
+                    // Fast K-Means (K=2) for Heel/Toe blobs
+                    let c1 = redPixels[0], c2 = redPixels[redPixels.length - 1];
+                    for (let iter = 0; iter < 2; iter++) {
+                        let s1x=0, s1y=0, n1=0, s2x=0, s2y=0, n2=0;
+                        for (let p of redPixels) {
+                            let d1 = (p.x-c1.x)**2 + (p.y-c1.y)**2;
+                            let d2 = (p.x-c2.x)**2 + (p.y-c2.y)**2;
+                            if (d1 < d2) { s1x+=p.x; s1y+=p.y; n1++; } else { s2x+=p.x; s2y+=p.y; n2++; }
                         }
-                        
-                        if (crossed) {
-                            let distPixels = Math.abs(cx - lastBlobPos.x); 
-                            let speedPixels = distPixels / dt;
-                            let rawCamSpeed = speedPixels * 0.003; 
-                            
-                            if (rawCamSpeed > 0.1) {
-                                triggerDiscreteSwing(rawCamSpeed);
+                        if(n1>0) c1 = {x: s1x/n1, y: s1y/n1};
+                        if(n2>0) c2 = {x: s2x/n2, y: s2y/n2};
+                    }
+                    
+                    let cx = (c1.x + c2.x) / 2;
+                    let cy = (c1.y + c2.y) / 2;
+
+                    // Draw the two blobs
+                    ctxCam.fillStyle = '#ff00ff'; ctxCam.beginPath(); ctxCam.arc(c1.x, c1.y, 5, 0, 2*Math.PI); ctxCam.fill();
+                    ctxCam.fillStyle = '#00ffff'; ctxCam.beginPath(); ctxCam.arc(c2.x, c2.y, 5, 0, 2*Math.PI); ctxCam.fill();
+                    ctxCam.strokeStyle = 'rgba(0, 255, 0, 0.5)'; ctxCam.lineWidth = 2;
+                    ctxCam.strokeRect(cx - searchRadius, cy - searchRadius, searchRadius * 2, searchRadius * 2);
+
+                    if (lastBlobPos && lastFrameTime > 0) {
+                        let dt = (now - lastFrameTime) / 1000;
+                        if (dt > 0) {
+                            // Crossing Horizontal Line (any direction)
+                            let crossed = (lastBlobPos.y > midY && cy <= midY) || (lastBlobPos.y < midY && cy >= midY);
+                            if (crossed) {
+                                let distPixels = Math.abs(cy - lastBlobPos.y); 
+                                let speedPixels = distPixels / dt;
+                                let rawCamSpeed = speedPixels * 0.003; 
+                                
+                                if (rawCamSpeed > 0.1) {
+                                    let dx = c2.x - c1.x; let dy = c2.y - c1.y;
+                                    let angle = dx !== 0 ? Math.atan(dy / dx) * (180 / Math.PI) : 0;
+                                    let faceStr = Math.abs(angle) < 3.0 ? "SQUARE" : (angle > 0 ? "PUSH" : "PULL");
+                                    lastFaceAngleInfo = `Face: ${Math.abs(angle).toFixed(1)}° (${faceStr})`;
+                                    triggerDiscreteSwing(rawCamSpeed, lastFaceAngleInfo);
+                                }
                             }
                         }
                     }
+                    lastBlobPos = {x: cx, y: cy};
+                } else {
+                    lastBlobPos = null;
                 }
-                lastBlobPos = {x: cx, y: cy};
+
             } else {
-                lastBlobPos = null; // Lost target
+                // FRONT / BACK VIEW LOGIC: Vertical Line, 1 Blob
+                let midX = canvasEl.width / 2;
+                ctxCam.strokeStyle = 'rgba(255, 255, 0, 0.4)';
+                ctxCam.beginPath(); ctxCam.moveTo(midX, 0); ctxCam.lineTo(midX, canvasEl.height); ctxCam.stroke();
+
+                if (redPixels.length > 5) {
+                    let sumX = 0, sumY = 0;
+                    for(let p of redPixels) { sumX += p.x; sumY += p.y; }
+                    let cx = sumX / redPixels.length;
+                    let cy = sumY / redPixels.length;
+
+                    ctxCam.fillStyle = '#00ff00'; ctxCam.beginPath(); ctxCam.arc(cx, cy, 5, 0, 2*Math.PI); ctxCam.fill();
+                    ctxCam.strokeStyle = 'rgba(0, 255, 0, 0.5)'; ctxCam.lineWidth = 2;
+                    ctxCam.strokeRect(cx - searchRadius, cy - searchRadius, searchRadius * 2, searchRadius * 2);
+
+                    if (lastBlobPos && lastFrameTime > 0) {
+                        let dt = (now - lastFrameTime) / 1000;
+                        if (dt > 0) {
+                            let crossed = false;
+                            if (sysParams.handedness === 'RH') crossed = (lastBlobPos.x > midX && cx <= midX);
+                            else crossed = (lastBlobPos.x < midX && cx >= midX);
+                            
+                            if (crossed) {
+                                let distPixels = Math.abs(cx - lastBlobPos.x); 
+                                let speedPixels = distPixels / dt;
+                                let rawCamSpeed = speedPixels * 0.003; 
+                                if (rawCamSpeed > 0.1) {
+                                    lastFaceAngleInfo = ""; // Not available in side view
+                                    triggerDiscreteSwing(rawCamSpeed, lastFaceAngleInfo);
+                                }
+                            }
+                        }
+                    }
+                    lastBlobPos = {x: cx, y: cy};
+                } else {
+                    lastBlobPos = null;
+                }
             }
             
             lastFrameTime = now;
@@ -611,7 +644,6 @@
                 return;
             }
 
-            // Gyro Init
             if (!activeAxes.alpha && !activeAxes.beta && !activeAxes.gamma) {
                 alert("Please select at least one Gyro Axis in the menu to track swings!");
                 return;
@@ -646,8 +678,8 @@
             }
         }
 
-        // --- DISCRETE EVENT SWING (Used by Camera at centerline cross) ---
-        function triggerDiscreteSwing(speed) {
+        // --- DISCRETE EVENT SWING ---
+        function triggerDiscreteSwing(speed, faceAngleInfo = "") {
             if (activeOverlay === 'wii') {
                 gyroPeak = speed;
                 wiiSpeedVal.innerText = gyroPeak.toFixed(2);
@@ -655,7 +687,7 @@
                 wiiFeedback.style.color = "#ffaa00";
                 wiiFeedback.innerText = "SWING DETECTED";
                 if(navigator.vibrate) navigator.vibrate(50);
-                setTimeout(() => { finishWiiSwing(); }, 400); // Small visual delay before grading
+                setTimeout(() => { finishWiiSwing(); }, 400); 
             } else if (activeOverlay === 'play1') {
                 calSwings.push(speed);
                 updateCalSwingsList();
@@ -707,7 +739,7 @@
             if (phase === 1) {
                 activeOverlay = 'play1';
                 isSwinging = false; gyroPeak = 0; recentSpeeds = [0,0,0];
-                calSwings = [];
+                calSwings = []; lastFaceAngleInfo = "";
                 updateCalSwingsList();
                 document.getElementById('btnFinishPhase1').style.display = 'none';
                 playCalSpeedDisplay.innerText = "0.00";
@@ -716,8 +748,6 @@
                 playPhase1.style.display = 'flex';
             } else if (phase === 2) {
                 activeOverlay = 'play2'; 
-                
-                // Build the radio selector for Phase 2 based on recorded swings
                 const selDiv = document.getElementById('calSpeedSelector');
                 selDiv.innerHTML = calSwings.map((s, i) => `
                     <label style="display:block; padding:8px; background:#222; margin-bottom:5px; border-radius:5px; cursor:pointer;">
@@ -747,24 +777,19 @@
             
             if(steps <= 0) { alert("Steps must be greater than 0."); return; }
 
-            // Convert steps to true meters 
             let effectiveSteps = steps * (1 + Math.abs(lrSlope) * 0.015);
             let distM = effectiveSteps * 0.9144; 
             
-            // Determine absolute True Physics of the putt based on exact Stimp
             let mu = 5.493 / sysParams.stimp;
             let slopeAcc = 9.81 * Math.sin(upSlope * Math.PI / 180) * 0.714;
             let totalAcc = mu + slopeAcc;
             
             if (totalAcc <= 0.01) {
-                alert(`PHYSICS ERROR: A putt cannot stop after ${steps} steps on a ${upSlope}° downhill slope at ${sysParams.stimp} Stimp. Gravity overcomes friction and the ball would roll forever. Try a flatter putt for calibration.`);
+                alert(`PHYSICS ERROR: A putt cannot stop after ${steps} steps on a ${upSlope}° downhill slope at ${sysParams.stimp} Stimp. Try a flatter putt for calibration.`);
                 return; 
             }
             
-            // Calculate exactly what the true velocity MUST have been physically
             let trueVelocityRequired = Math.sqrt(2 * totalAcc * distM);
-            
-            // Set the multiplier so the app knows how to map your raw sensor up to true physics
             let newMult = trueVelocityRequired / v_displayed;
             
             sysParams.speedMult = parseFloat(newMult.toFixed(2));
@@ -774,7 +799,6 @@
             showPlayPhase(3);
         };
 
-        // Auto-update Play Mode recommendation on input change
         const playInputs = ['playSteps', 'playUpSlope', 'playLRSlope'];
         playInputs.forEach(id => {
             document.getElementById(id).addEventListener('input', calculatePlayRecommendation);
@@ -845,13 +869,14 @@
             isSwinging = false;
             gyroPeak = 0;
             recentSpeeds = [0, 0, 0];
+            lastFaceAngleInfo = "";
             
             wiiOverlay.style.display = 'flex';
             wiiSpeedVal.innerText = "0.00";
             wiiBarFill.style.width = "0%";
             wiiFeedback.style.color = "transparent";
             wiiFeedback.innerText = "AWAITING SWING";
-            wiiDistanceFeedback.innerText = "";
+            wiiDistanceFeedback.innerHTML = "";
             wiiTargetVal.innerText = sysParams.pwr.toFixed(2);
             
             const mu = 5.493 / sysParams.stimp;
@@ -880,7 +905,7 @@
 
         // --- GYRO CONTINUOUS TRACKING ---
         function handleMotion(e) {
-            if (inputMode !== 'gyro') return; // Ignore if in camera mode
+            if (inputMode !== 'gyro') return; 
             let rot = e.rotationRate;
             if (!rot) return;
 
@@ -916,7 +941,7 @@
                         clearTimeout(resetUITimer);
                         wiiFeedback.style.color = "#ffaa00";
                         wiiFeedback.innerText = "SWINGING...";
-                        wiiDistanceFeedback.innerText = "";
+                        wiiDistanceFeedback.innerHTML = "";
                     }
                     if (smoothedRawSpeedMs > gyroPeak) {
                         gyroPeak = smoothedRawSpeedMs;
@@ -995,16 +1020,17 @@
                     wiiFeedback.innerText = "TOO SOFT!";
                 }
                 
-                wiiDistanceFeedback.innerText = distText;
+                wiiDistanceFeedback.innerHTML = distText + (lastFaceAngleInfo ? `<br><span style="color:#ffaa00; font-size:1.2rem; display:block; margin-top:5px;">${lastFaceAngleInfo}</span>` : "");
 
                 clearTimeout(resetUITimer);
                 resetUITimer = setTimeout(() => { 
                     if (activeOverlay === 'wii') {
                         wiiFeedback.style.color = "transparent";
                         wiiFeedback.innerText = "AWAITING SWING";
-                        wiiDistanceFeedback.innerText = "";
+                        wiiDistanceFeedback.innerHTML = "";
                         wiiBarFill.style.width = "0%";
                         wiiSpeedVal.innerText = "0.00";
+                        lastFaceAngleInfo = "";
                     }
                 }, 4000);
                 
