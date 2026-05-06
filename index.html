@@ -59,7 +59,6 @@
         .wii-speed-text { font-size: 3rem; color: #fff; margin-top: 40px; font-weight: bold; font-family: monospace; }
         #wiiFeedback, #playCalFeedback { font-size: 2.5rem; margin-top: 20px; font-weight: bold; color: transparent; text-transform: uppercase; letter-spacing: 2px; text-shadow: none; transition: 0.3s; }
         #wiiDistanceFeedback { font-size: 1.5rem; margin-top: 10px; font-weight: normal; color: #ccc; letter-spacing: 1px; min-height: 28px; }
-        /* Moved to LEFT to avoid camera overlap */
         .close-btn { position: absolute; top: 30px; left: 30px; background: #dc3545; color: #fff; border: none; font-size: 1.5rem; font-weight: bold; width: 60px; height: 60px; border-radius: 30px; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.5); z-index: 300; }
 
         /* PLAY MODE CSS */
@@ -107,14 +106,21 @@
         
         <div id="playPhase1" class="play-phase">
             <div class="wii-title">1. Calibration Putt</div>
-            <div style="font-size:1.2rem; color:#aaa; margin-bottom:20px; text-align:center; line-height:1.5;">Hit a normal practice putt.<br>The app will capture its speed.</div>
+            <div style="font-size:1.2rem; color:#aaa; margin-bottom:20px; text-align:center; line-height:1.5;">Hit a practice putt.<br>Take multiple if needed.</div>
             <div class="wii-speed-text"><span id="playCalSpeedDisplay">0.00</span> <span style="font-size: 1.5rem; color: #aaa;">m/s</span></div>
             <div id="playCalFeedback">AWAITING SWING</div>
+            
+            <div id="calSwingList" style="margin-top:15px; width:100%; max-height: 100px; overflow-y:auto; color:#fff; font-family:monospace; text-align:center;"></div>
+            
+            <button id="btnFinishPhase1" class="btn" style="background:#8e44ad; width:100%; padding:15px; margin-top:20px; font-size:1.2rem; border-radius:12px; display:none;">NEXT STEP</button>
         </div>
 
         <div id="playPhase2" class="play-phase" style="display:none;">
             <div class="wii-title">2. Enter Results</div>
-            <div style="color:#00ffcc; font-size:1.8rem; margin-bottom:20px;">Speed Hit: <span id="playCalRecordedSpeed">0.00</span> m/s</div>
+            
+            <div style="color:#00ffcc; font-size:1.2rem; margin-bottom:10px;">Select Swing Speed to Calibrate:</div>
+            <div id="calSpeedSelector" style="width:100%; background:#111; border:1px solid #444; border-radius:8px; padding:10px; margin-bottom:20px; max-height:140px; overflow-y:auto;">
+                </div>
             
             <div class="play-input-group">
                 <label>Steps Rolled:</label>
@@ -229,12 +235,23 @@
         <div class="slider-group">
             <label>Input Mode</label>
             <div class="adj-controls">
-                <button id="btnModeGyro" class="adj-btn mode-btn" style="background:#28a745;">GYRO</button>
-                <button id="btnModeCam" class="adj-btn mode-btn" style="background:#333;">CAMERA</button>
+                <button id="btnModeCam" class="adj-btn mode-btn" style="background:#28a745;">CAMERA</button>
+                <button id="btnModeGyro" class="adj-btn mode-btn" style="background:#333;">GYRO</button>
+            </div>
+        </div>
+
+        <div class="slider-group" id="camConfigGroup">
+            <label>Camera Track Box Size</label>
+            <div class="adj-controls">
+                <button class="adj-btn" data-param="camBox" data-val="-10">-10</button>
+                <button class="adj-btn" data-param="camBox" data-val="-5">-5</button>
+                <span id="camBoxVal" class="val-display">40</span>
+                <button class="adj-btn" data-param="camBox" data-val="5">+5</button>
+                <button class="adj-btn" data-param="camBox" data-val="10">+10</button>
             </div>
         </div>
         
-        <div class="slider-group" id="gyroConfigGroup">
+        <div class="slider-group" id="gyroConfigGroup" style="display:none;">
             <label>Gyro Axes (Toggle Multiple)</label>
             <div class="adj-controls">
                 <button class="adj-btn axis-btn" data-axis="alpha" style="background:#333;">ALPHA</button>
@@ -314,11 +331,11 @@
         
         let sysParams = {
             frontYds: 100.0, backYds: 130.0, slope: 3.0,
-            smooth: 20, stimp: 10.0, aim: 0.0, pwr: 3.2, speedMult: 1.0
+            smooth: 20, stimp: 10.0, aim: 0.0, pwr: 3.2, speedMult: 1.0, camBox: 40
         };
 
         // --- SENSOR VARIABLES ---
-        let inputMode = 'gyro'; // 'gyro' or 'cam'
+        let inputMode = 'cam'; // 'gyro' or 'cam' defaults to cam now
         let isSensorInit = false;
         let gyroPeak = 0;
         let isSwinging = false;
@@ -326,6 +343,7 @@
         let resetUITimer = null; 
         const RADIUS_TO_PIVOT_METERS = 1.3;
         let recentSpeeds = [0, 0, 0];
+        let calSwings = []; // To hold multiple calibration swings
         
         let activeAxes = { alpha: false, beta: true, gamma: false }; 
         let activeOverlay = 'none'; // 'none', 'wii', 'play1'
@@ -365,7 +383,6 @@
         const playPhase3 = document.getElementById('playPhase3');
         const playCalSpeedDisplay = document.getElementById('playCalSpeedDisplay');
         const playCalFeedback = document.getElementById('playCalFeedback');
-        const playCalRecordedSpeed = document.getElementById('playCalRecordedSpeed');
         const lblPlayStimp = document.getElementById('lblPlayStimp');
         const lblPlayMult = document.getElementById('lblPlayMult');
 
@@ -388,6 +405,7 @@
             document.getElementById('btnModeGyro').style.background = mode === 'gyro' ? '#28a745' : '#333';
             document.getElementById('btnModeCam').style.background = mode === 'cam' ? '#28a745' : '#333';
             document.getElementById('gyroConfigGroup').style.display = mode === 'gyro' ? 'block' : 'none';
+            document.getElementById('camConfigGroup').style.display = mode === 'cam' ? 'block' : 'none';
             if (mode === 'gyro') {
                 stopCamera();
             } else {
@@ -415,15 +433,12 @@
             light.position.set(5, 20, 10);
             scene.add(light);
             
-            ghostBall = new THREE.Mesh(new THREE.SphereGeometry(0.021, 16, 16), new THREE.MeshBasicMaterial({color: 0xffffff}));
-            ghostBall.visible = false;
-            scene.add(ghostBall);
-            
             window.addEventListener('pointerdown', (e) => {
                 if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON' || uiPanel.contains(e.target) || wiiOverlay.contains(e.target) || playOverlay.contains(e.target) || document.getElementById('cameraContainer').contains(e.target) || !meshSurface) return;
                 onPick(e);
             });
             
+            setInputMode('cam'); // Launch directly into cam mode
             animate();
         }
 
@@ -470,23 +485,28 @@
             let data = frame.data;
             let sumX = 0, sumY = 0, count = 0;
             
-            // Defines how far the club can travel per frame before it breaks tracking (80px radius = 160x160 window)
-            let searchRadius = 80; 
+            let searchRadius = sysParams.camBox; 
 
             // Thresholding and manipulation loop
             for (let i = 0; i < data.length; i += 4) {
+                let pixelIndex = i / 4;
+                let px = pixelIndex % canvasEl.width;
+                let py = Math.floor(pixelIndex / canvasEl.width);
+
+                // BOTTOM HALF ONLY: Black out top half to avoid hats/shirts
+                if (py < canvasEl.height / 2) {
+                    data[i] = 0; data[i+1] = 0; data[i+2] = 0;
+                    continue;
+                }
+
                 let r = data[i], g = data[i+1], b = data[i+2];
                 
                 // High Red, low Green, low Blue
                 if (r > 100 && r > g * 1.5 && r > b * 1.5) {
-                    let pixelIndex = i / 4;
-                    let px = pixelIndex % canvasEl.width;
-                    let py = Math.floor(pixelIndex / canvasEl.width);
-
                     // Spatial Filtering: If we have a track, ignore red outside the window
                     if (lastBlobPos) {
                         if (Math.abs(px - lastBlobPos.x) > searchRadius || Math.abs(py - lastBlobPos.y) > searchRadius) {
-                            // Turn ignored red pixels DARK RED so the user knows they are excluded
+                            // Turn ignored red pixels DARK RED so user knows they are excluded
                             data[i] = 100; data[i+1] = 0; data[i+2] = 0;
                             continue;
                         }
@@ -504,12 +524,18 @@
                 }
             }
             
-            // Draw the binary threshold image back to the canvas so the user sees it
             ctxCam.putImageData(frame, 0, 0);
+
+            // Draw center crossing line (yellow)
+            let midX = canvasEl.width / 2;
+            ctxCam.strokeStyle = 'rgba(255, 255, 0, 0.4)';
+            ctxCam.beginPath();
+            ctxCam.moveTo(midX, canvasEl.height / 2);
+            ctxCam.lineTo(midX, canvasEl.height);
+            ctxCam.stroke();
 
             let now = performance.now();
             
-            // Must have a minimum amount of valid pixels to count as the putter
             if (count > 5) { 
                 let cx = sumX / count;
                 let cy = sumY / count;
@@ -526,25 +552,23 @@
                 if (lastBlobPos && lastFrameTime > 0) {
                     let dt = (now - lastFrameTime) / 1000; 
                     if (dt > 0) {
-                        let dx = cx - lastBlobPos.x;
+                        // CROSSING LOGIC: Check if it crossed the middle line this exact frame
+                        let crossed = (lastBlobPos.x > midX && cx <= midX) || (lastBlobPos.x < midX && cx >= midX);
                         
-                        // ONLY tracking horizontal pixel displacement
-                        let distPixels = Math.abs(dx); 
-                        
-                        if (distPixels > 2) { 
+                        if (crossed) {
+                            let distPixels = Math.abs(cx - lastBlobPos.x); 
                             let speedPixels = distPixels / dt;
                             let rawCamSpeed = speedPixels * 0.003; 
-                            processSensorSpeed(rawCamSpeed);
-                        } else {
-                            processSensorSpeed(0);
+                            
+                            if (rawCamSpeed > 0.1) {
+                                triggerDiscreteSwing(rawCamSpeed);
+                            }
                         }
                     }
                 }
                 lastBlobPos = {x: cx, y: cy};
             } else {
-                // We lost the target. Clear last position so we scan the whole frame next time to re-acquire.
-                lastBlobPos = null;
-                processSensorSpeed(0);
+                lastBlobPos = null; // Lost target
             }
             
             lastFrameTime = now;
@@ -593,6 +617,38 @@
             }
         }
 
+        // --- DISCRETE EVENT SWING (Used by Camera at centerline cross) ---
+        function triggerDiscreteSwing(speed) {
+            if (activeOverlay === 'wii') {
+                gyroPeak = speed;
+                wiiSpeedVal.innerText = gyroPeak.toFixed(2);
+                wiiBarFill.style.width = Math.min((gyroPeak / wiiMaxSpeed) * 100, 100) + "%";
+                wiiFeedback.style.color = "#ffaa00";
+                wiiFeedback.innerText = "SWING DETECTED";
+                if(navigator.vibrate) navigator.vibrate(50);
+                setTimeout(() => { finishWiiSwing(); }, 400); // Small visual delay before grading
+            } else if (activeOverlay === 'play1') {
+                calSwings.push(speed);
+                updateCalSwingsList();
+                playCalSpeedDisplay.innerText = speed.toFixed(2);
+                playCalFeedback.style.color = "#00ff00";
+                playCalFeedback.innerText = "RECORDED!";
+                if(navigator.vibrate) navigator.vibrate(50);
+                setTimeout(() => { 
+                    playCalFeedback.style.color = "transparent"; 
+                    playCalFeedback.innerText = "AWAITING SWING";
+                }, 1000);
+            }
+        }
+
+        function updateCalSwingsList() {
+            const listDiv = document.getElementById('calSwingList');
+            listDiv.innerHTML = calSwings.map((s, i) => `Swing ${i+1}: ${s.toFixed(2)} m/s`).join('<br>');
+            if (calSwings.length > 0) {
+                document.getElementById('btnFinishPhase1').style.display = 'block';
+            }
+        }
+
         // --- PLAY MODE LOGIC ---
         document.getElementById('playModeBtn').onclick = () => {
             initSensorsSafe(() => {
@@ -610,6 +666,10 @@
             showPlayPhase(1);
         };
 
+        document.getElementById('btnFinishPhase1').onclick = () => {
+            showPlayPhase(2);
+        };
+
         function showPlayPhase(phase) {
             playPhase1.style.display = 'none';
             playPhase2.style.display = 'none';
@@ -618,13 +678,25 @@
             if (phase === 1) {
                 activeOverlay = 'play1';
                 isSwinging = false; gyroPeak = 0; recentSpeeds = [0,0,0];
+                calSwings = [];
+                updateCalSwingsList();
+                document.getElementById('btnFinishPhase1').style.display = 'none';
                 playCalSpeedDisplay.innerText = "0.00";
                 playCalFeedback.innerText = "AWAITING SWING";
                 playCalFeedback.style.color = "transparent";
                 playPhase1.style.display = 'flex';
             } else if (phase === 2) {
                 activeOverlay = 'play2'; 
-                playCalRecordedSpeed.innerText = gyroPeak.toFixed(2);
+                
+                // Build the radio selector for Phase 2 based on recorded swings
+                const selDiv = document.getElementById('calSpeedSelector');
+                selDiv.innerHTML = calSwings.map((s, i) => `
+                    <label style="display:block; padding:8px; background:#222; margin-bottom:5px; border-radius:5px; cursor:pointer;">
+                        <input type="radio" name="calSpeedSel" value="${s}" ${i === calSwings.length-1 ? 'checked' : ''} style="margin-right:10px;">
+                        Swing ${i+1}: <span style="color:#ffeb3b; font-weight:bold;">${s.toFixed(2)} m/s</span>
+                    </label>
+                `).join('');
+
                 playPhase2.style.display = 'flex';
             } else if (phase === 3) {
                 activeOverlay = 'play3'; 
@@ -636,7 +708,10 @@
         }
 
         document.getElementById('btnPlayCalibrate').onclick = () => {
-            let v_displayed = parseFloat(playCalRecordedSpeed.innerText); 
+            const selectedRadio = document.querySelector('input[name="calSpeedSel"]:checked');
+            if (!selectedRadio) { alert("Please select a swing speed."); return; }
+            
+            let v_displayed = parseFloat(selectedRadio.value); 
             let steps = parseFloat(document.getElementById('calSteps').value);
             let upSlope = parseFloat(document.getElementById('calUpSlope').value);
             let lrSlope = parseFloat(document.getElementById('calLRSlope').value);
@@ -774,6 +849,7 @@
             wiiLongLine.style.left = Math.min(longPct, 100) + "%";
         }
 
+        // --- GYRO CONTINUOUS TRACKING ---
         function handleMotion(e) {
             if (inputMode !== 'gyro') return; // Ignore if in camera mode
             let rot = e.rotationRate;
@@ -790,7 +866,6 @@
             processSensorSpeed(rawSpeedMs);
         }
 
-        // Unified function to handle speed logic for both Gyro and Camera
         function processSensorSpeed(rawSpeedMs) {
             if (activeOverlay !== 'wii' && activeOverlay !== 'play1') return;
 
@@ -799,7 +874,6 @@
             
             let smoothedRawSpeedMs = (recentSpeeds[0] + recentSpeeds[1] + recentSpeeds[2]) / 3;
 
-            // Handle UI Updates
             if (activeOverlay === 'wii') {
                 if (!isSwinging) {
                     wiiSpeedVal.innerText = smoothedRawSpeedMs.toFixed(2);
@@ -840,8 +914,15 @@
                         swingTimer = setTimeout(() => { 
                             if (isSwinging) {
                                 isSwinging = false;
+                                calSwings.push(gyroPeak);
+                                updateCalSwingsList();
                                 if(navigator.vibrate) navigator.vibrate(50);
-                                setTimeout(() => { showPlayPhase(2); }, 1000);
+                                playCalFeedback.style.color = "#00ff00";
+                                playCalFeedback.innerText = "RECORDED!";
+                                setTimeout(() => { 
+                                    playCalFeedback.style.color = "transparent"; 
+                                    playCalFeedback.innerText = "AWAITING SWING";
+                                }, 1000);
                             }
                         }, 1200);
                     }
@@ -1028,6 +1109,7 @@
             else if (param === 'stimp') newVal = Math.max(1, newVal);
             else if (param === 'pwr') newVal = Math.max(0.1, newVal);
             else if (param === 'speedMult') newVal = Math.max(0.01, newVal); 
+            else if (param === 'camBox') newVal = Math.max(10, Math.min(120, newVal)); 
             
             sysParams[param] = parseFloat(newVal.toFixed(3));
             updateAllParamDisplays();
@@ -1057,6 +1139,7 @@
             document.getElementById('aimVal').innerText = sysParams.aim.toFixed(1) + '°';
             document.getElementById('pwrVal').innerText = sysParams.pwr.toFixed(2) + ' m/s';
             document.getElementById('speedMultVal').innerText = sysParams.speedMult.toFixed(2) + 'x';
+            document.getElementById('camBoxVal').innerText = sysParams.camBox;
         }
 
         // --- CORE 3D FUNCTIONS ---
