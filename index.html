@@ -98,6 +98,7 @@
             <canvas id="camCanvas" width="320" height="240"></canvas>
             <div class="cam-overlay-controls">
                 <button id="camViewBtn" class="cam-btn">CAM: FRONT</button>
+                <button id="camMaskBtn" class="cam-btn" style="background:#e91e63;">MASK: OFF</button>
                 <button id="camLineBtn" class="cam-btn" style="background:#00bcd4;">LINE: VERT</button>
             </div>
         </div>
@@ -380,6 +381,7 @@
         let camStream = null;
         let camViewMode = 'front'; // 'front', 'back', 'top'
         let camLineOrient = 'vertical'; // 'vertical', 'horizontal'
+        let camMaskTop = false; // NEW TOGGLE
         let lastBlobPos = null;
         let lastFrameTime = 0;
         let camTrackingInterval = null;
@@ -416,6 +418,13 @@
         // Manual Rotate Toggle
         document.getElementById('rotateToggle').onclick = () => {
             appWrapper.classList.toggle('upside-down');
+        };
+
+        // Mask Toggle
+        document.getElementById('camMaskBtn').onclick = () => {
+            camMaskTop = !camMaskTop;
+            document.getElementById('camMaskBtn').innerText = `MASK: ${camMaskTop ? 'TOP' : 'OFF'}`;
+            document.getElementById('camMaskBtn').style.background = camMaskTop ? '#28a745' : '#e91e63';
         };
 
         // Line Orientation Toggle
@@ -552,6 +561,13 @@
             for (let i = 0; i < data.length; i += 4) {
                 let px = (i / 4) % canvasEl.width;
                 let py = Math.floor((i / 4) / canvasEl.width);
+
+                // MASK LOGIC: Ignore anything in the top 50% of the Y axis
+                if (camMaskTop && py < canvasEl.height / 2) {
+                    data[i] = 0; data[i+1] = 0; data[i+2] = 0;
+                    continue;
+                }
+
                 let r = data[i], g = data[i+1], b = data[i+2];
                 
                 if (r > 100 && r > g * 1.5 && r > b * 1.5) {
@@ -959,7 +975,7 @@
             const targetDistM = (trueTargetPwr * trueTargetPwr) / (2 * mu);
             
             const shortDistM = Math.max(0, targetDistM - 0.6096); 
-            const longDistM = targetDistM + 0.6096;               
+            const longDistM = targetDistM + 0.6096;                
             
             let truePwrShort = Math.sqrt(2 * mu * shortDistM);
             let truePwrLong = Math.sqrt(2 * mu * longDistM);
