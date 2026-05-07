@@ -381,7 +381,8 @@
         let camStream = null;
         let camViewMode = 'front'; // 'front', 'back', 'top'
         let camLineOrient = 'vertical'; // 'vertical', 'horizontal'
-        let camMaskTop = false; // NEW TOGGLE
+        let camMaskMode = 0; // 0: OFF, 1: TOP, 2: BTM, 3: BOTH
+        const maskLabels = ['OFF', 'TOP', 'BTM', 'BOTH'];
         let lastBlobPos = null;
         let lastFrameTime = 0;
         let camTrackingInterval = null;
@@ -420,11 +421,11 @@
             appWrapper.classList.toggle('upside-down');
         };
 
-        // Mask Toggle
+        // Mask Cycle Toggle
         document.getElementById('camMaskBtn').onclick = () => {
-            camMaskTop = !camMaskTop;
-            document.getElementById('camMaskBtn').innerText = `MASK: ${camMaskTop ? 'TOP' : 'OFF'}`;
-            document.getElementById('camMaskBtn').style.background = camMaskTop ? '#28a745' : '#e91e63';
+            camMaskMode = (camMaskMode + 1) % 4;
+            document.getElementById('camMaskBtn').innerText = `MASK: ${maskLabels[camMaskMode]}`;
+            document.getElementById('camMaskBtn').style.background = camMaskMode === 0 ? '#e91e63' : '#28a745';
         };
 
         // Line Orientation Toggle
@@ -557,13 +558,22 @@
             let searchRadius = sysParams.camBox; 
             let redPixels = [];
 
+            let maskTop = (camMaskMode === 1 || camMaskMode === 3);
+            let maskBtm = (camMaskMode === 2 || camMaskMode === 3);
+            let topThreshold = canvasEl.height / 2; // Mask top 50%
+            let btmThreshold = canvasEl.height * 0.8; // Mask bottom 20%
+
             // Find all valid red pixels across the ENTIRE image
             for (let i = 0; i < data.length; i += 4) {
                 let px = (i / 4) % canvasEl.width;
                 let py = Math.floor((i / 4) / canvasEl.width);
 
-                // MASK LOGIC: Ignore anything in the top 50% of the Y axis
-                if (camMaskTop && py < canvasEl.height / 2) {
+                // MASK LOGIC: Ignore regions based on mode
+                if (maskTop && py < topThreshold) {
+                    data[i] = 0; data[i+1] = 0; data[i+2] = 0;
+                    continue;
+                }
+                if (maskBtm && py > btmThreshold) {
                     data[i] = 0; data[i+1] = 0; data[i+2] = 0;
                     continue;
                 }
