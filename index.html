@@ -84,6 +84,14 @@
         #camCanvas { display: block; width: 180px; height: 140px; }
         .cam-overlay-controls { position:absolute; bottom:5px; width:100%; display:flex; justify-content:space-around; }
         .cam-btn { background:rgba(0,0,0,0.7); color:#fff; border:1px solid #555; padding:4px 8px; border-radius:4px; font-size:10px; cursor:pointer; font-weight: bold; }
+
+        /* AR SCAN UI */
+        #arOverlay {
+            position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(0,0,0,0.4); z-index: 300; display: none;
+            flex-direction: column; align-items: center; justify-content: flex-end; padding-bottom: 50px;
+        }
+        .ar-stats { background: rgba(0,0,0,0.8); color: #00ffcc; padding: 15px 30px; border-radius: 15px; margin-bottom: 20px; font-family: monospace; font-size: 18px; border: 1px solid #00ffcc; box-shadow: 0 0 15px rgba(0,255,204,0.3); }
     </style>
 </head>
 <body>
@@ -101,6 +109,11 @@
                 <button id="camMaskBtn" class="cam-btn" style="background:#e91e63;">MASK: OFF</button>
                 <button id="camLineBtn" class="cam-btn" style="background:#00bcd4;">LINE: VERT</button>
             </div>
+        </div>
+
+        <div id="arOverlay">
+            <div class="ar-stats">POINTS CAPTURED: <span id="arPointCount">0</span></div>
+            <button id="btnEndAR" class="btn" style="background:#dc3545; padding:20px 40px; font-size:1.2rem; width:auto; border-radius:30px; box-shadow: 0 5px 15px rgba(0,0,0,0.5);">FINISH SCAN & LOAD</button>
         </div>
 
         <div id="wiiOverlay">
@@ -321,6 +334,7 @@
         </div>
 
         <div id="controls">
+            <button id="btnScanAR" class="btn" style="background:#ff9800;">SCAN AR</button>
             <label class="btn" style="background:#555;">LOAD PLY<input type="file" id="plyInput" accept=".ply" style="display:none;"></label>
             <label class="btn" style="background:#007bff;">LOAD IMG<input type="file" id="imgInput" accept="image/*" style="display:none;"></label>
             <label class="btn" style="background:#8e44ad;">LOAD SAVED<input type="file" id="loadSaveInput" accept=".json" style="display:none;"></label>
@@ -382,7 +396,6 @@
         let camViewMode = 'front'; // 'front', 'back', 'top'
         let camLineOrient = 'vertical'; // 'vertical', 'horizontal'
         let camMaskMode = 0; // 0: OFF, 1: TOP, 2: BTM, 3: BOTH
-        const maskLabels = ['OFF', 'TOP', 'BTM', 'BOTH'];
         let lastBlobPos = null;
         let lastFrameTime = 0;
         let camTrackingInterval = null;
@@ -390,6 +403,11 @@
         const canvasEl = document.getElementById('camCanvas');
         const ctxCam = canvasEl.getContext('2d', { willReadFrequently: true });
         const appWrapper = document.getElementById('app-wrapper'); 
+
+        // --- AR SCAN VARIABLES ---
+        let xrSession = null;
+        let isARScanning = false;
+        let arPoints = [];
 
         const uiPanel = document.getElementById('ui');
         
@@ -474,9 +492,13 @@
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
             camera.position.set(0, 15, 20);
-            renderer = new THREE.WebGLRenderer({ antialias: true });
+            
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.setPixelRatio(window.devicePixelRatio);
+            
+            // XR Configuration for AR Mode
+            renderer.xr.enabled = true;
             
             // Append to the wrapper instead of document body
             appWrapper.appendChild(renderer.domElement);
@@ -495,12 +517,131 @@
             scene.add(ghostBall);
             
             window.addEventListener('pointerdown', (e) => {
-                if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON' || uiPanel.contains(e.target) || wiiOverlay.contains(e.target) || playOverlay.contains(e.target) || document.getElementById('cameraContainer').contains(e.target) || !meshSurface) return;
+                if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON' || uiPanel.contains(e.target) || wiiOverlay.contains(e.target) || playOverlay.contains(e.target) || document.getElementById('cameraContainer').contains(e.target) || document.getElementById('arOverlay').contains(e.target) || !meshSurface) return;
                 onPick(e);
             });
             
             setInputMode('cam'); 
-            animate();
+            
+            // Use setAnimationLoop for WebXR compatibility instead of requestAnimationFrame
+            renderer.setAnimationLoop(animateLoop);
+        }
+
+        // --- AR SCANNER WEBXR LOGIC ---
+        document.getElementById('btnScanAR').onclick = async () => {
+            if (!('xr' in navigator)) {
+                alert("WebXR is not supported on this browser.");
+                return;
+            }
+            try {
+                const supported = await navigator.xr.isSessionSupported('immersive-ar');
+                if (!supported) {
+                    alert("Immersive AR is not supported on this device.");
+                    return;
+                }
+
+                xrSession = await navigator.xr.requestSession('immersive-ar', {
+                    requiredFeatures: ['depth-sensing'],
+                    depthSensing: {
+                        usagePreference: ['cpu-optimized'],
+                        dataFormatPreference: ['luminance-alpha']
+                    }
+                });
+
+                renderer.xr.setReferenceSpaceType('local');
+                await renderer.xr.setSession(xrSession);
+
+                document.getElementById('arOverlay').style.display = 'flex';
+                arPoints = [];
+                isARScanning = true;
+
+                xrSession.addEventListener('end', () => {
+                    isARScanning = false;
+                    document.getElementById('arOverlay').style.display = 'none';
+                    if (arPoints.length > 0) {
+                        generatePLYFromAR(arPoints);
+                    }
+                    xrSession = null;
+                });
+
+            } catch (e) {
+                alert("AR Depth API initialization failed. Ensure you have supported hardware and flags enabled. Details: " + e.message);
+            }
+        };
+
+        document.getElementById('btnEndAR').onclick = () => {
+            if (xrSession) xrSession.end();
+        };
+
+        function generatePLYFromAR(points) {
+            let ply = `ply\nformat ascii 1.0\nelement vertex ${points.length}\nproperty float x\nproperty float y\nproperty float z\nend_header\n`;
+            for(let p of points) {
+                ply += `${p.x} ${p.y} ${p.z}\n`;
+            }
+            const blob = new Blob([ply], {type: 'text/plain'});
+            const url = URL.createObjectURL(blob);
+            
+            const loader = new PLYLoader();
+            loader.load(url, (geo) => {
+                lastGeo = geo;
+                currentMode = 'ply';
+                document.getElementById('imgConfig').style.display = 'none';
+                
+                const reader = new FileReader();
+                reader.onload = (ev) => { originalFileDataBase64 = ev.target.result; };
+                reader.readAsDataURL(blob);
+                
+                processTerrainPLY();
+                enableControls();
+            });
+        }
+
+        function animateLoop(time, frame) {
+            if (ghostBall.visible && pathData.length > 0) {
+                let ghostIdx = (Math.floor(Date.now() / 20)) % pathData.length;
+                ghostBall.position.copy(pathData[ghostIdx]);
+            }
+            controls.update(); 
+
+            // Handle AR Depth Extraction
+            if (isARScanning && frame) {
+                const referenceSpace = renderer.xr.getReferenceSpace();
+                const viewerPose = frame.getViewerPose(referenceSpace);
+                
+                if (viewerPose) {
+                    for (const view of viewerPose.views) {
+                        let depthInfo = null;
+                        try {
+                            depthInfo = frame.getDepthInformation(view);
+                        } catch(e) { /* Ignore frames where depth buffer isn't ready */ }
+                        
+                        if (depthInfo) {
+                            const xrCam = renderer.xr.getCamera(camera).cameras[0] || camera;
+                            
+                            // Sample points sparsely to maintain framerate
+                            for(let i=0; i<40; i++) {
+                                let x = Math.floor(Math.random() * depthInfo.width);
+                                let y = Math.floor(Math.random() * depthInfo.height);
+                                let dist = depthInfo.getDepthInMeters(x, y);
+                                
+                                if (dist > 0.1 && dist < 6.0) { 
+                                    let nx = (x / depthInfo.width) * 2 - 1;
+                                    let ny = -(y / depthInfo.height) * 2 + 1;
+                                    
+                                    let pt = new THREE.Vector3(nx, ny, 0.5);
+                                    pt.unproject(xrCam);
+                                    pt.sub(xrCam.position).normalize().multiplyScalar(dist).add(xrCam.position);
+                                    
+                                    arPoints.push(pt);
+                                }
+                            }
+                            document.getElementById('arPointCount').innerText = arPoints.length;
+                        }
+                    }
+                }
+            }
+
+            renderer.render(scene, camera);
         }
 
         // --- CAMERA MACHINE VISION LOGIC ---
@@ -1640,15 +1781,6 @@
         document.getElementById('optimizeBtn').onclick = optimizePutt;
         document.getElementById('resetBtn').onclick = resetPutt;
 
-        function animate() {
-            requestAnimationFrame(animate);
-            if (ghostBall.visible && pathData.length > 0) {
-                let ghostIdx = (Math.floor(Date.now() / 20)) % pathData.length;
-                ghostBall.position.copy(pathData[ghostIdx]);
-            }
-            controls.update(); renderer.render(scene, camera);
-        }
-        
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
